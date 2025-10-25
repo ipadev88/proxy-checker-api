@@ -1,0 +1,78 @@
+groups:
+  - name: proxy_checker_alerts
+    interval: 30s
+    rules:
+      # No alive proxies
+      - alert: NoAliveProxies
+        expr: proxychecker_alive_proxies == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "No alive proxies available"
+          description: "Proxy checker has 0 alive proxies for more than 5 minutes"
+
+      # Low proxy count
+      - alert: LowProxyCount
+        expr: proxychecker_alive_proxies < 100
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Low proxy count"
+          description: "Only {{ $value }} alive proxies available"
+
+      # High check failure rate
+      - alert: HighCheckFailureRate
+        expr: |
+          (
+            rate(proxychecker_checks_failure_total[5m]) /
+            rate(proxychecker_checks_total{result="success"}[5m] + proxychecker_checks_total{result="failure"}[5m])
+          ) > 0.8
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High proxy check failure rate"
+          description: "More than 80% of proxy checks are failing"
+
+      # API response time
+      - alert: HighAPIResponseTime
+        expr: histogram_quantile(0.99, rate(proxychecker_api_request_duration_seconds_bucket[5m])) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High API response time"
+          description: "99th percentile API response time is {{ $value }}s"
+
+      # Service down
+      - alert: ProxyCheckerDown
+        expr: up{job="proxy-checker"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Proxy Checker service is down"
+          description: "Proxy Checker has been down for more than 1 minute"
+
+      # High memory usage (if node_exporter is available)
+      - alert: HighMemoryUsage
+        expr: process_resident_memory_bytes{job="proxy-checker"} > 500000000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage"
+          description: "Proxy Checker is using {{ $value | humanize }}B of memory"
+
+      # Slow check cycle
+      - alert: SlowCheckCycle
+        expr: rate(proxychecker_checks_total[1m]) < 100
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Slow proxy checking"
+          description: "Proxy check rate is only {{ $value }} checks/sec"
+

@@ -1,0 +1,62 @@
+{
+  "aggregator": {
+    "interval_seconds": 60,
+    "sources": [
+      {
+        "url": "https://raw.githubusercontent.com/TheSpeedX/PROXY-List/master/http.txt",
+        "type": "txt",
+        "enabled": true
+      },
+      {
+        "url": "https://raw.githubusercontent.com/clarketm/proxy-list/master/proxy-list-raw.txt",
+        "type": "txt",
+        "enabled": true
+      },
+      {
+        "url": "https://api.proxyscrape.com/v2/?request=get&protocol=http&timeout=10000&country=all",
+        "type": "txt",
+        "enabled": true
+      },
+      {
+        "url": "https://www.proxy-list.download/api/v1/get?type=http",
+        "type": "txt",
+        "enabled": true
+      }
+    ],
+    "user_agent": "Mozilla/5.0 (compatible; ProxyChecker/1.0)"
+  },
+  "checker": {
+    "timeout_ms": 15000,
+    "concurrency_total": 20000,
+    "batch_size": 2000,
+    "retries": 1,
+    "test_url": "https://www.google.com/generate_204",
+    "mode": "full-http",
+    "enable_adaptive_concurrency": true,
+    "max_fd_usage_percent": 80,
+    "max_cpu_usage_percent": 95
+  },
+  "api": {
+    "addr": ":8080",
+    "api_key_env": "PROXY_API_KEY",
+    "rate_limit_per_minute": 1200,
+    "rate_limit_per_ip": 100,
+    "enable_api_key_auth": true,
+    "enable_ip_rate_limit": true
+  },
+  "storage": {
+    "type": "file",
+    "path": "/data/proxies.json",
+    "persist_interval_seconds": 300
+  },
+  "metrics": {
+    "enabled": true,
+    "endpoint": "/metrics",
+    "namespace": "proxychecker"
+  },
+  "logging": {
+    "level": "info",
+    "format": "json"
+  }
+}
+

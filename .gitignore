@@ -1,0 +1,50 @@
+# Binaries
+proxy-checker
+build/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, build with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+coverage.html
+
+# Go workspace file
+go.work
+
+# Environment variables
+.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Data files
+*.db
+*.json.tmp
+/data/
+proxies.json
+
+# Logs
+*.log
+logs/
+
+# Config (keep example)
+config.json
+
+# Temporary files
+*.tmp
+tmp/
+
