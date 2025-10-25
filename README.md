@@ -19,7 +19,7 @@ A production-ready, high-performance proxy aggregation, validation, and delivery
 
 ```bash
 # Clone repository
-git clone https://github.com/your-org/proxy-checker-api.git
+git clone https://github.com/ipadev88/proxy-checker-api.git
 cd proxy-checker-api
 
 # Set API key
@@ -29,17 +29,17 @@ echo "PROXY_API_KEY=your-secure-key-here" > .env
 docker-compose up -d
 
 # Check health
-curl http://localhost:8080/health
+curl http://localhost:8083/health
 
 # Get proxies
-curl -H "X-Api-Key: your-secure-key-here" http://localhost:8080/get-proxy
+curl -H "X-Api-Key: your-secure-key-here" http://localhost:8083/get-proxy
 ```
 
 ### Binary Installation
 
 ```bash
 # Download latest release
-curl -L https://github.com/your-org/proxy-checker/releases/latest/download/proxy-checker-linux-amd64 \
+curl -L https://github.com/ipadev88/proxy-checker/releases/latest/download/proxy-checker-linux-amd64 \
   -o proxy-checker
 
 # Make executable
@@ -60,7 +60,7 @@ export PROXY_API_KEY="your-secure-key-here"
 
 ```bash
 # Requirements: Go 1.21+
-git clone https://github.com/your-org/proxy-checker-api.git
+git clone https://github.com/ipadev88/proxy-checker-api.git
 cd proxy-checker-api
 
 # Install dependencies
@@ -174,13 +174,13 @@ Get proxy address(es). Requires authentication.
 
 Get single proxy (plain text):
 ```bash
-curl -H "X-Api-Key: your-key" http://localhost:8080/get-proxy
+curl -H "X-Api-Key: your-key" http://localhost:8083/get-proxy
 # Output: 1.2.3.4:8080
 ```
 
 Get 10 proxies (plain text):
 ```bash
-curl -H "X-Api-Key: your-key" "http://localhost:8080/get-proxy?limit=10"
+curl -H "X-Api-Key: your-key" "http://localhost:8083/get-proxy?limit=10"
 # Output:
 # 1.2.3.4:8080
 # 5.6.7.8:3128
@@ -189,7 +189,7 @@ curl -H "X-Api-Key: your-key" "http://localhost:8080/get-proxy?limit=10"
 
 Get proxies (JSON):
 ```bash
-curl -H "X-Api-Key: your-key" "http://localhost:8080/get-proxy?limit=5&format=json"
+curl -H "X-Api-Key: your-key" "http://localhost:8083/get-proxy?limit=5&format=json"
 ```
 
 **JSON Response:**
@@ -358,7 +358,7 @@ services:
     image: your-org/proxy-checker:latest
     restart: unless-stopped
     ports:
-      - "8080:8080"
+      - "8083:8083"
     volumes:
       - ./config.json:/app/config.json:ro
       - proxy-data:/data
@@ -459,10 +459,10 @@ ls -la /var/lib/proxy-checker
 ### No proxies available
 ```bash
 # Check stats
-curl -H "X-Api-Key: $KEY" http://localhost:8080/stat
+curl -H "X-Api-Key: $KEY" http://localhost:8083/stat
 
 # Trigger manual reload
-curl -X POST -H "X-Api-Key: $KEY" http://localhost:8080/reload
+curl -X POST -H "X-Api-Key: $KEY" http://localhost:8083/reload
 
 # Check source availability
 curl -I https://raw.githubusercontent.com/TheSpeedX/PROXY-List/master/http.txt
