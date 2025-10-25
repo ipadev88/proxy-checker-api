@@ -27,7 +27,7 @@ This fixes ALL common issues including docker-compose errors!
   sudo apt-get install docker-compose-plugin
   docker compose up -d
 
-  See DOCKER_FIX.md for detailed solutions.
+  See TROUBLESHOOTING.md for detailed solutions.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -35,10 +35,9 @@ This fixes ALL common issues including docker-compose errors!
 
   • START_HERE.txt         ← You are here
   • README.md              ← Main documentation
-  • DOCKER_FIX.md          ← Fix docker-compose errors
+  • DEPLOY_NOW.md          ← Quick deployment with all fixes
   • TROUBLESHOOTING.md     ← Complete troubleshooting guide  
   • QUICKREF.md            ← Quick command reference
-  • FIXES_APPLIED.md       ← What was fixed in this version
   • setup-ubuntu.sh        ← Automated setup script
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -119,7 +118,7 @@ Port: 8083 (changed from 8080 in this version)
   ✅ Added comprehensive documentation
   ✅ Added troubleshooting guides
   
-  See FIXES_APPLIED.md for complete details.
+  See DEPLOY_NOW.md for deployment instructions.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 

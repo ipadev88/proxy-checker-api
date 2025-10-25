@@ -305,7 +305,7 @@ docker compose exec proxy-checker sh
 
 ## 📚 Documentation
 
-- **DOCKER_FIX.md** - Docker-compose error solutions
+- **DEPLOY_NOW.md** - Quick deployment guide with all fixes
 - **TROUBLESHOOTING.md** - Complete troubleshooting guide
 - **README.md** - Full documentation
 - **OPS_CHECKLIST.md** - Production deployment
@@ -378,7 +378,7 @@ docker compose exec proxy-checker sh
 ## 📞 Quick Help
 
 **Issue with docker-compose?**
-→ See DOCKER_FIX.md or run `sudo bash setup-ubuntu.sh`
+→ See DEPLOY_NOW.md or run `sudo bash setup-ubuntu.sh`
 
 **No proxies working?**
 → Wait 2 minutes, then check `/stat` endpoint

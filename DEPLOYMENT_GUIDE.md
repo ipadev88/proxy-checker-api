@@ -495,7 +495,7 @@ curl http://localhost:8083/metrics | grep go_memstats
 
 1. **START_HERE.txt** - Quick start guide (plain text)
 2. **QUICKREF.md** - Command reference card
-3. **DOCKER_FIX.md** - Docker-compose specific fixes
+3. **DEPLOY_NOW.md** - Quick deployment guide with all fixes
 4. **TROUBLESHOOTING.md** - Complete troubleshooting guide
 5. **README.md** - Full documentation
 
@@ -580,11 +580,10 @@ Your deployment is successful when:
 ### New Files
 
 - `setup-ubuntu.sh` - Automated setup script
-- `DOCKER_FIX.md` - Docker-compose troubleshooting
+- `DEPLOY_NOW.md` - Quick deployment guide
 - `TROUBLESHOOTING.md` - Complete troubleshooting guide
 - `QUICKREF.md` - Quick reference card
 - `START_HERE.txt` - Quick start guide
-- `FIXES_APPLIED.md` - List of all fixes
 - `DEPLOYMENT_GUIDE.md` - This file
 
 ---

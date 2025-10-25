@@ -8,7 +8,7 @@
 [![Go Version](https://img.shields.io/badge/Go-1.21+-00ADD8?logo=go)](https://golang.org/)
 [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker)](https://www.docker.com/)
 
-*Optimized for 10k-30k concurrent proxy checks on a 8-thread server*
+*Optimized for 10k-25k concurrent proxy checks on a 12-thread server*
 
 [Quick Start](#quick-start) • [Features](#features) • [Documentation](#documentation) • [Troubleshooting](#troubleshooting)
 
@@ -18,7 +18,7 @@
 
 ## ✨ Features
 
-- ⚡ **High-Concurrency Checking** - 10k-30k concurrent proxy validations using Go goroutines + netpoll
+- ⚡ **High-Concurrency Checking** - 10k-25k concurrent proxy validations using Go goroutines + netpoll
 - 🔄 **Atomic Snapshot Updates** - Zero-downtime updates with lock-free reads
 - 💾 **Multiple Storage Backends** - File, SQLite, Redis support
 - 🌐 **RESTful API** - Fast, authenticated endpoints with rate limiting
@@ -80,7 +80,7 @@ curl -H "X-Api-Key: $API_KEY" http://localhost:8083/stat | jq
 ```
 
 **⚠️ Common Issue:** Getting `URLSchemeUnknown: Not supported URL scheme http+docker` error?  
-→ See **[DOCKER_FIX.md](DOCKER_FIX.md)** or run `sudo bash setup-ubuntu.sh`
+→ See **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** or run `sudo bash setup-ubuntu.sh`
 
 ### Binary Installation
 
@@ -438,7 +438,7 @@ sudo apt-get install docker-compose-plugin
 docker compose up -d
 ```
 
-📖 **See [DOCKER_FIX.md](DOCKER_FIX.md) for detailed solutions**
+📖 **See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for detailed solutions**
 
 ---
 
@@ -669,7 +669,7 @@ See [TESTS.md](TESTS.md) for complete testing documentation.
 
 ### Setup & Deployment
 - **[DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md)** - Complete deployment walkthrough
-- **[DOCKER_FIX.md](DOCKER_FIX.md)** - Fix docker-compose issues
+- **[DEPLOY_NOW.md](DEPLOY_NOW.md)** - Quick deployment guide with all fixes
 - **[setup-ubuntu.sh](setup-ubuntu.sh)** - Automated setup script
 
 ### Troubleshooting & Operations
@@ -680,7 +680,6 @@ See [TESTS.md](TESTS.md) for complete testing documentation.
 - **[ARCHITECTURE.md](ARCHITECTURE.md)** - System architecture details
 - **[PERFORMANCE_TESTING.md](PERFORMANCE_TESTING.md)** - Performance benchmarks
 - **[TESTS.md](TESTS.md)** - Testing documentation
-- **[FIXES_APPLIED.md](FIXES_APPLIED.md)** - Recent fixes and changes
 
 ---
 
@@ -729,14 +728,13 @@ Built with excellent open-source tools:
 
 **Current Version:** 1.0.0
 
-**What's New:**
+**What's New in v1.0.0:**
 - ✅ Fixed docker-compose compatibility issues
 - ✅ Standardized ports (now consistent on 8083)
 - ✅ Added automated setup script
 - ✅ Comprehensive documentation
 - ✅ Enhanced troubleshooting guides
-
-See [FIXES_APPLIED.md](FIXES_APPLIED.md) for complete changelog.
+- ✅ Fixed all build errors (circular imports, type mismatches)
 
 ---
 

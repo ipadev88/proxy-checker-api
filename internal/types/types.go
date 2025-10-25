@@ -17,7 +17,7 @@ type Stats struct {
 	TotalDead     int                    `json:"total_dead"`
 	AlivePercent  float64                `json:"alive_percent"`
 	LastCheckTime time.Time              `json:"last_check_time"`
-	SourceStats   map[string]interface{} `json:"source_stats,omitempty"`
+	SourceStats   interface{}            `json:"source_stats,omitempty"`
 }
 
 // Snapshot represents a point-in-time snapshot of proxy data

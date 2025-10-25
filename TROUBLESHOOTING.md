@@ -40,7 +40,7 @@ sudo apt-get install docker-compose-plugin
 docker compose up -d
 ```
 
-**See also:** `DOCKER_FIX.md` for detailed solutions
+**See also:** `DEPLOY_NOW.md` for deployment guide with all fixes applied
 
 ---
 
@@ -648,7 +648,7 @@ Note: Some settings (like port, storage type) require a full restart.
 ## Still Having Issues?
 
 1. Run the automated setup script: `sudo bash setup-ubuntu.sh`
-2. Check `DOCKER_FIX.md` for docker-compose specific issues
+2. Check `DEPLOY_NOW.md` for quick deployment guide
 3. Review `README.md` for general documentation
 4. Check `OPS_CHECKLIST.md` for production setup
 5. Review logs carefully: `docker compose logs proxy-checker`

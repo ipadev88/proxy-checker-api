@@ -252,6 +252,6 @@ echo ""
 echo -e "For monitoring: ${BLUE}docker compose --profile monitoring up -d${NC}"
 echo -e "Then access Grafana at: ${BLUE}http://localhost:3000${NC} (admin/admin)"
 echo ""
-echo -e "For more information, see: ${BLUE}README.md${NC} and ${BLUE}DOCKER_FIX.md${NC}"
+echo -e "For more information, see: ${BLUE}README.md${NC} and ${BLUE}DEPLOY_NOW.md${NC}"
 echo ""
 
