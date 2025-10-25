@@ -6,7 +6,7 @@ services:
     container_name: proxy-checker
     restart: unless-stopped
     ports:
-      - "8080:8080"
+      - "8083:8083"
     volumes:
       - ./config.json:/app/config.json:ro
       - proxy-data:/data
