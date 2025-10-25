@@ -1,39 +1,89 @@
-# Proxy Checker API
+## Troubleshooting
 
-A production-ready, high-performance proxy aggregation, validation, and delivery service optimized for 10k-25k concurrent proxy checks on a 12-thread server.
+**Common Issues:**
 
-## Features
+### Docker-Compose Error: `URLSchemeUnknown: Not supported URL scheme http+docker`
 
-✅ **High-Concurrency Checking** - 10k-25k concurrent proxy validations using Go goroutines + netpoll  
-✅ **Atomic Snapshot Updates** - Zero-downtime updates with lock-free reads  
-✅ **Multiple Storage Backends** - File, SQLite, Redis support  
-✅ **RESTful API** - Fast, authenticated endpoints with rate limiting  
-✅ **Prometheus Metrics** - Full observability and monitoring  
-✅ **Hot Reload** - Update configuration without restart  
-✅ **Adaptive Concurrency** - Automatic backpressure and resource management  
-✅ **Production Ready** - Docker, systemd, monitoring, alerts included  
+**Quick Fix:**
+```bash
+sudo bash setup-ubuntu.sh
+```
 
-## Quick Start
+**Manual Fix:**
+```bash
+# Install Docker Compose v2 Plugin
+sudo apt-get remove docker-compose
+sudo apt-get install docker-compose-plugin
 
-### Docker (Recommended)
+# Use 'docker compose' (with space)
+docker compose up -d
+```
+
+See **[DOCKER_FIX.md](DOCKER_FIX.md)** for detailed solutions.
+
+### No proxies available
 
 ```bash
-# Clone repository
-git clone https://github.com/ipadev88/proxy-checker-api.git
+# Wait 1-2 minutes for first check, then:
+API_KEY=$(grep PROXY_API_KEY .env | cut -d= -f2)
+curl -H "X-Api-Key: $API_KEY" http://localhost:8083/stat | jq
+
+# Trigger manual reload
+curl -X POST -H "X-Api-Key: $API_KEY" http://localhost:8083/reload
+```
+
+### Service won't start
+
+```bash
+# Check logs
+docker compose logs proxy-checker --tail=50
+
+# Verify config.json exists
+cp config.example.json config.json
+
+# Rebuild and restart
+docker compose down
+docker compose build --no-cache
+docker compose up -d
+```
+
+### High CPU/Memory usage
+
+Reduce concurrency in `config.json`:
+```json
+{
+  "checker": {
+    "concurrency_total": 10000,
+    "batch_size": 1000
+  }
+}
+```
+
+**For complete troubleshooting guide, see [TROUBLESHOOTING.md](TROUBLESHOOTING.md)**
+
+**For Docker-specific issues, see [DOCKER_FIX.md](DOCKER_FIX.md)**
+
+**For production setup, see [OPS_CHECKLIST.md](OPS_CHECKLIST.md)**hub.com/ipadev88/proxy-checker-api.git
 cd proxy-checker-api
 
-# Set API key
-echo "PROXY_API_KEY=your-secure-key-here" > .env
+# Copy config
+cp config.example.json config.json
 
-# Start service
-docker-compose up -d
+# Set API key
+echo "PROXY_API_KEY=$(openssl rand -hex 16)" > .env
+
+# Start service (use 'docker compose' with space, not hyphen)
+docker compose up -d
 
 # Check health
 curl http://localhost:8083/health
 
-# Get proxies
-curl -H "X-Api-Key: your-secure-key-here" http://localhost:8083/get-proxy
+# Get your API key and test
+API_KEY=$(grep PROXY_API_KEY .env | cut -d= -f2)
+curl -H "X-Api-Key: $API_KEY" http://localhost:8083/stat
 ```
+
+**Common Issue:** If you get `URLSchemeUnknown: Not supported URL scheme http+docker` error, see **[DOCKER_FIX.md](DOCKER_FIX.md)** or run `sudo bash setup-ubuntu.sh`.
 
 ### Binary Installation
 
@@ -444,46 +494,70 @@ See `TESTS.md` for complete testing documentation.
 
 ## Troubleshooting
 
-### Service won't start
+**Common Issues:**
+
+### Docker-Compose Error: `URLSchemeUnknown: Not supported URL scheme http+docker`
+
+**Quick Fix:**
 ```bash
-# Check logs
-journalctl -u proxy-checker -n 50
-
-# Verify config
-./proxy-checker -validate
-
-# Check permissions
-ls -la /var/lib/proxy-checker
+sudo bash setup-ubuntu.sh
 ```
+
+**Manual Fix:**
+```bash
+# Install Docker Compose v2 Plugin
+sudo apt-get remove docker-compose
+sudo apt-get install docker-compose-plugin
+
+# Use 'docker compose' (with space)
+docker compose up -d
+```
+
+See **[DOCKER_FIX.md](DOCKER_FIX.md)** for detailed solutions.
 
 ### No proxies available
+
 ```bash
-# Check stats
-curl -H "X-Api-Key: $KEY" http://localhost:8083/stat
+# Wait 1-2 minutes for first check, then:
+API_KEY=$(grep PROXY_API_KEY .env | cut -d= -f2)
+curl -H "X-Api-Key: $API_KEY" http://localhost:8083/stat | jq
 
 # Trigger manual reload
-curl -X POST -H "X-Api-Key: $KEY" http://localhost:8083/reload
-
-# Check source availability
-curl -I https://raw.githubusercontent.com/TheSpeedX/PROXY-List/master/http.txt
+curl -X POST -H "X-Api-Key: $API_KEY" http://localhost:8083/reload
 ```
 
-### High memory usage
+### Service won't start
+
 ```bash
-# Check current usage
-ps aux | grep proxy-checker
+# Check logs
+docker compose logs proxy-checker --tail=50
 
-# Get heap profile
-curl http://localhost:8080/debug/pprof/heap > heap.prof
-go tool pprof -top heap.prof
+# Verify config.json exists
+cp config.example.json config.json
 
-# Solutions:
-# - Reduce concurrency_total
-# - Reduce batch_size
-# - Check for goroutine leaks
+# Rebuild and restart
+docker compose down
+docker compose build --no-cache
+docker compose up -d
 ```
 
-See `OPS_CHECKLIST.md` for complete troubleshooting guide.
+### High CPU/Memory usage
+
+Reduce concurrency in `config.json`:
+```json
+{
+  "checker": {
+    "concurrency_total": 10000,
+    "batch_size": 1000
+  }
+}
+```
+
+**For complete troubleshooting guide, see [TROUBLESHOOTING.md](TROUBLESHOOTING.md)**
+
+**For Docker-specific issues, see [DOCKER_FIX.md](DOCKER_FIX.md)**
+
+**For production setup, see [OPS_CHECKLIST.md](OPS_CHECKLIST.md)**
 
 ## Architecture
 

@@ -1,0 +1,140 @@
+╔═══════════════════════════════════════════════════════════════════════════╗
+║                    PROXY CHECKER API - START HERE                         ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+
+🚀 QUICK START (Ubuntu Server)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Run this ONE command:
+
+    sudo bash setup-ubuntu.sh
+
+This fixes ALL common issues including docker-compose errors!
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+❌ GOT THIS ERROR?
+
+  "URLSchemeUnknown: Not supported URL scheme http+docker"
+
+✅ SOLUTION:
+
+  sudo bash setup-ubuntu.sh
+
+  OR manually:
+
+  sudo apt-get remove docker-compose
+  sudo apt-get install docker-compose-plugin
+  docker compose up -d
+
+  See DOCKER_FIX.md for detailed solutions.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📚 DOCUMENTATION FILES
+
+  • START_HERE.txt         ← You are here
+  • README.md              ← Main documentation
+  • DOCKER_FIX.md          ← Fix docker-compose errors
+  • TROUBLESHOOTING.md     ← Complete troubleshooting guide  
+  • QUICKREF.md            ← Quick command reference
+  • FIXES_APPLIED.md       ← What was fixed in this version
+  • setup-ubuntu.sh        ← Automated setup script
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔧 MANUAL SETUP (If you don't want to use setup script)
+
+1. Copy config:
+   cp config.example.json config.json
+
+2. Create API key:
+   echo "PROXY_API_KEY=$(openssl rand -hex 16)" > .env
+
+3. Start service:
+   docker compose up -d
+
+4. Wait 1-2 minutes, then test:
+   API_KEY=$(grep PROXY_API_KEY .env | cut -d= -f2)
+   curl -H "X-Api-Key: $API_KEY" http://localhost:8083/stat
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🐛 TROUBLESHOOTING
+
+Issue                              Solution
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+docker-compose error               sudo bash setup-ubuntu.sh
+No proxies available               Wait 2 min, check /stat endpoint
+Container won't start              Check logs: docker compose logs
+401 Unauthorized                   Check .env file for API key
+Port already in use                Change port in config.json
+High CPU/memory                    Reduce concurrency_total in config.json
+
+For detailed troubleshooting, see TROUBLESHOOTING.md
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📋 USEFUL COMMANDS
+
+# View logs
+docker compose logs -f proxy-checker
+
+# Restart service
+docker compose restart proxy-checker
+
+# Check health
+curl http://localhost:8083/health
+
+# Get your API key
+cat .env | grep PROXY_API_KEY
+
+# Get statistics
+API_KEY=$(grep PROXY_API_KEY .env | cut -d= -f2)
+curl -H "X-Api-Key: $API_KEY" http://localhost:8083/stat | jq
+
+# Get a proxy
+curl -H "X-Api-Key: $API_KEY" http://localhost:8083/get-proxy
+
+See QUICKREF.md for more commands.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🌐 API ENDPOINTS
+
+Port: 8083 (changed from 8080 in this version)
+
+  • http://localhost:8083/health        - Health check
+  • http://localhost:8083/stat          - Statistics (auth required)
+  • http://localhost:8083/get-proxy     - Get proxy (auth required)
+  • http://localhost:8083/metrics       - Prometheus metrics
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✨ WHAT'S FIXED IN THIS VERSION
+
+  ✅ Fixed docker-compose compatibility error
+  ✅ Fixed port mismatch (now consistent on 8083)
+  ✅ Added automated setup script
+  ✅ Added comprehensive documentation
+  ✅ Added troubleshooting guides
+  
+  See FIXES_APPLIED.md for complete details.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+💡 TIPS
+
+  • First proxy check takes 1-2 minutes after starting
+  • Use 'docker compose' (with space) not 'docker-compose' (with hyphen)
+  • Save your API key from the .env file
+  • Check logs if something doesn't work
+  • System tuning is applied automatically by setup-ubuntu.sh
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Need help? Read README.md for full documentation or TROUBLESHOOTING.md
+for detailed problem-solving steps.
+
+Version: 1.0.0 | Last Updated: October 25, 2025
+

@@ -41,11 +41,11 @@ RUN mkdir -p /data && chown -R proxychecker:proxychecker /data /app
 USER proxychecker
 
 # Expose API port
-EXPOSE 8080
+EXPOSE 8083
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
+    CMD wget --no-verbose --tries=1 --spider http://localhost:8083/health || exit 1
 
 # Run the application
 CMD ["./proxy-checker"]

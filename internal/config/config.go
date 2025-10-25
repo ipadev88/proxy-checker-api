@@ -108,7 +108,7 @@ func Load(filePath string) (*Config, error) {
 		cfg.Checker.TestURL = "https://www.google.com/generate_204"
 	}
 	if cfg.API.Addr == "" {
-		cfg.API.Addr = ":8080"
+		cfg.API.Addr = ":8083"
 	}
 	if cfg.API.RateLimitPerMinute == 0 {
 		cfg.API.RateLimitPerMinute = 1200
