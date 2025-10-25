@@ -37,7 +37,7 @@
     "max_cpu_usage_percent": 95
   },
   "api": {
-    "addr": ":8080",
+    "addr": ":8083",
     "api_key_env": "PROXY_API_KEY",
     "rate_limit_per_minute": 1200,
     "rate_limit_per_ip": 100,
