@@ -8,7 +8,7 @@
 [![Go Version](https://img.shields.io/badge/Go-1.21+-00ADD8?logo=go)](https://golang.org/)
 [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker)](https://www.docker.com/)
 
-*Optimized for 10k-25k concurrent proxy checks on a 12-thread server*
+*Optimized for 10k-30k concurrent proxy checks on a 8-thread server*
 
 [Quick Start](#quick-start) • [Features](#features) • [Documentation](#documentation) • [Troubleshooting](#troubleshooting)
 
@@ -18,7 +18,7 @@
 
 ## ✨ Features
 
-- ⚡ **High-Concurrency Checking** - 10k-25k concurrent proxy validations using Go goroutines + netpoll
+- ⚡ **High-Concurrency Checking** - 10k-30k concurrent proxy validations using Go goroutines + netpoll
 - 🔄 **Atomic Snapshot Updates** - Zero-downtime updates with lock-free reads
 - 💾 **Multiple Storage Backends** - File, SQLite, Redis support
 - 🌐 **RESTful API** - Fast, authenticated endpoints with rate limiting
@@ -37,7 +37,7 @@
 
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/proxy-checker-api.git
+git clone https://github.com/ipadev88/proxy-checker-api.git
 cd proxy-checker-api
 
 # Run automated setup
@@ -57,7 +57,7 @@ sudo bash setup-ubuntu.sh
 
 ```bash
 # Clone and navigate
-git clone https://github.com/yourusername/proxy-checker-api.git
+git clone https://github.com/ipadev88/proxy-checker-api.git
 cd proxy-checker-api
 
 # Copy configuration
@@ -86,7 +86,7 @@ curl -H "X-Api-Key: $API_KEY" http://localhost:8083/stat | jq
 
 ```bash
 # Download latest release
-curl -L https://github.com/yourusername/proxy-checker/releases/latest/download/proxy-checker-linux-amd64 \
+curl -L https://github.com/ipadev88/proxy-checker/releases/latest/download/proxy-checker-linux-amd64 \
   -o proxy-checker
 
 # Make executable
@@ -106,7 +106,7 @@ export PROXY_API_KEY="your-secure-key-here"
 
 ```bash
 # Requirements: Go 1.21+
-git clone https://github.com/yourusername/proxy-checker-api.git
+git clone https://github.com/ipadev88/proxy-checker-api.git
 cd proxy-checker-api
 
 # Install dependencies
