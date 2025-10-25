@@ -1,95 +1,92 @@
-## Troubleshooting
+# Proxy Checker API
 
-**Common Issues:**
+<div align="center">
 
-### Docker-Compose Error: `URLSchemeUnknown: Not supported URL scheme http+docker`
+**A production-ready, high-performance proxy aggregation, validation, and delivery service**
 
-**Quick Fix:**
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Go Version](https://img.shields.io/badge/Go-1.21+-00ADD8?logo=go)](https://golang.org/)
+[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker)](https://www.docker.com/)
+
+*Optimized for 10k-25k concurrent proxy checks on a 12-thread server*
+
+[Quick Start](#quick-start) • [Features](#features) • [Documentation](#documentation) • [Troubleshooting](#troubleshooting)
+
+</div>
+
+---
+
+## ✨ Features
+
+- ⚡ **High-Concurrency Checking** - 10k-25k concurrent proxy validations using Go goroutines + netpoll
+- 🔄 **Atomic Snapshot Updates** - Zero-downtime updates with lock-free reads
+- 💾 **Multiple Storage Backends** - File, SQLite, Redis support
+- 🌐 **RESTful API** - Fast, authenticated endpoints with rate limiting
+- 📊 **Prometheus Metrics** - Full observability and monitoring
+- 🔥 **Hot Reload** - Update configuration without restart
+- 🎯 **Adaptive Concurrency** - Automatic backpressure and resource management
+- 🚀 **Production Ready** - Docker, systemd, monitoring, alerts included
+
+---
+
+## 🚀 Quick Start
+
+### Ubuntu Server (Automated - Recommended)
+
+**One-command setup that fixes all common issues including docker-compose errors:**
+
 ```bash
+# Clone repository
+git clone https://github.com/yourusername/proxy-checker-api.git
+cd proxy-checker-api
+
+# Run automated setup
 sudo bash setup-ubuntu.sh
 ```
 
-**Manual Fix:**
-```bash
-# Install Docker Compose v2 Plugin
-sudo apt-get remove docker-compose
-sudo apt-get install docker-compose-plugin
+**What the script does:**
+- ✅ Installs Docker if needed
+- ✅ Fixes docker-compose compatibility issues
+- ✅ Applies system tuning (file descriptors, TCP settings)
+- ✅ Creates configuration files
+- ✅ Generates secure API key
+- ✅ Starts the service
+- ✅ Displays test commands
 
-# Use 'docker compose' (with space)
-docker compose up -d
-```
-
-See **[DOCKER_FIX.md](DOCKER_FIX.md)** for detailed solutions.
-
-### No proxies available
+### Docker (Manual Setup)
 
 ```bash
-# Wait 1-2 minutes for first check, then:
-API_KEY=$(grep PROXY_API_KEY .env | cut -d= -f2)
-curl -H "X-Api-Key: $API_KEY" http://localhost:8083/stat | jq
-
-# Trigger manual reload
-curl -X POST -H "X-Api-Key: $API_KEY" http://localhost:8083/reload
-```
-
-### Service won't start
-
-```bash
-# Check logs
-docker compose logs proxy-checker --tail=50
-
-# Verify config.json exists
-cp config.example.json config.json
-
-# Rebuild and restart
-docker compose down
-docker compose build --no-cache
-docker compose up -d
-```
-
-### High CPU/Memory usage
-
-Reduce concurrency in `config.json`:
-```json
-{
-  "checker": {
-    "concurrency_total": 10000,
-    "batch_size": 1000
-  }
-}
-```
-
-**For complete troubleshooting guide, see [TROUBLESHOOTING.md](TROUBLESHOOTING.md)**
-
-**For Docker-specific issues, see [DOCKER_FIX.md](DOCKER_FIX.md)**
-
-**For production setup, see [OPS_CHECKLIST.md](OPS_CHECKLIST.md)**hub.com/ipadev88/proxy-checker-api.git
+# Clone and navigate
+git clone https://github.com/yourusername/proxy-checker-api.git
 cd proxy-checker-api
 
-# Copy config
+# Copy configuration
 cp config.example.json config.json
 
-# Set API key
+# Generate API key
 echo "PROXY_API_KEY=$(openssl rand -hex 16)" > .env
 
-# Start service (use 'docker compose' with space, not hyphen)
+# Start service (note: use 'docker compose' with space, not hyphen)
 docker compose up -d
 
 # Check health
 curl http://localhost:8083/health
 
-# Get your API key and test
+# Get your API key
 API_KEY=$(grep PROXY_API_KEY .env | cut -d= -f2)
-curl -H "X-Api-Key: $API_KEY" http://localhost:8083/stat
+
+# Wait 1-2 minutes for first proxy check, then test
+curl -H "X-Api-Key: $API_KEY" http://localhost:8083/stat | jq
 ```
 
-**Common Issue:** If you get `URLSchemeUnknown: Not supported URL scheme http+docker` error, see **[DOCKER_FIX.md](DOCKER_FIX.md)** or run `sudo bash setup-ubuntu.sh`.
+**⚠️ Common Issue:** Getting `URLSchemeUnknown: Not supported URL scheme http+docker` error?  
+→ See **[DOCKER_FIX.md](DOCKER_FIX.md)** or run `sudo bash setup-ubuntu.sh`
 
 ### Binary Installation
 
 ```bash
 # Download latest release
-curl -L https://github.com/ipadev88/proxy-checker/releases/latest/download/proxy-checker-linux-amd64 \
+curl -L https://github.com/yourusername/proxy-checker/releases/latest/download/proxy-checker-linux-amd64 \
   -o proxy-checker
 
 # Make executable
@@ -97,7 +94,6 @@ chmod +x proxy-checker
 
 # Create config
 cp config.example.json config.json
-nano config.json  # Edit as needed
 
 # Set API key
 export PROXY_API_KEY="your-secure-key-here"
@@ -110,7 +106,7 @@ export PROXY_API_KEY="your-secure-key-here"
 
 ```bash
 # Requirements: Go 1.21+
-git clone https://github.com/ipadev88/proxy-checker-api.git
+git clone https://github.com/yourusername/proxy-checker-api.git
 cd proxy-checker-api
 
 # Install dependencies
@@ -123,80 +119,15 @@ go build -o proxy-checker ./cmd/main.go
 ./proxy-checker
 ```
 
-## Configuration
+---
 
-### Minimal Configuration
-
-```json
-{
-  "aggregator": {
-    "interval_seconds": 60,
-    "sources": [
-      {
-        "url": "https://raw.githubusercontent.com/TheSpeedX/PROXY-List/master/http.txt",
-        "type": "txt",
-        "enabled": true
-      }
-    ]
-  },
-  "checker": {
-    "timeout_ms": 15000,
-    "concurrency_total": 20000,
-    "test_url": "https://www.google.com/generate_204",
-    "mode": "full-http"
-  },
-  "api": {
-    "addr": ":8080",
-    "api_key_env": "PROXY_API_KEY"
-  }
-}
-```
-
-### Tuning for 12-Thread Server
-
-**For 10k concurrent checks:**
-```json
-{
-  "checker": {
-    "concurrency_total": 10000,
-    "batch_size": 2000,
-    "timeout_ms": 15000
-  }
-}
-```
-
-**For 20k concurrent checks (recommended):**
-```json
-{
-  "checker": {
-    "concurrency_total": 20000,
-    "batch_size": 2000,
-    "timeout_ms": 15000
-  }
-}
-```
-
-**For 25k concurrent checks (maximum):**
-```json
-{
-  "checker": {
-    "concurrency_total": 25000,
-    "batch_size": 2500,
-    "timeout_ms": 12000,
-    "enable_adaptive_concurrency": true
-  }
-}
-```
-
-See `config.example.json` for full configuration options.
-
-## API Reference
+## 📖 API Reference
 
 ### Authentication
 
 All protected endpoints require an API key via:
-- Header: `X-Api-Key: your-api-key`
-- Query param: `?key=your-api-key`
+- **Header:** `X-Api-Key: your-api-key`
+- **Query parameter:** `?key=your-api-key`
 
 ### Endpoints
 
@@ -204,10 +135,11 @@ All protected endpoints require an API key via:
 
 Health check endpoint (no auth required).
 
-**Response:**
+```bash
+curl http://localhost:8083/health
 ```
-ok
-```
+
+**Response:** `ok`
 
 ---
 
@@ -222,24 +154,15 @@ Get proxy address(es). Requires authentication.
 
 **Examples:**
 
-Get single proxy (plain text):
 ```bash
+# Get single proxy (plain text)
 curl -H "X-Api-Key: your-key" http://localhost:8083/get-proxy
-# Output: 1.2.3.4:8080
-```
 
-Get 10 proxies (plain text):
-```bash
+# Get 10 proxies
 curl -H "X-Api-Key: your-key" "http://localhost:8083/get-proxy?limit=10"
-# Output:
-# 1.2.3.4:8080
-# 5.6.7.8:3128
-# ...
-```
 
-Get proxies (JSON):
-```bash
-curl -H "X-Api-Key: your-key" "http://localhost:8083/get-proxy?limit=5&format=json"
+# Get proxies in JSON format
+curl -H "X-Api-Key: your-key" "http://localhost:8083/get-proxy?format=json" | jq
 ```
 
 **JSON Response:**
@@ -263,6 +186,10 @@ curl -H "X-Api-Key: your-key" "http://localhost:8083/get-proxy?limit=5&format=js
 #### `GET /stat`
 
 Get proxy statistics. Requires authentication.
+
+```bash
+curl -H "X-Api-Key: your-key" http://localhost:8083/stat | jq
+```
 
 **Response:**
 ```json
@@ -289,6 +216,10 @@ Get proxy statistics. Requires authentication.
 
 Trigger immediate re-aggregation and re-checking. Requires authentication.
 
+```bash
+curl -X POST -H "X-Api-Key: your-key" http://localhost:8083/reload
+```
+
 **Response:**
 ```json
 {
@@ -302,7 +233,9 @@ Trigger immediate re-aggregation and re-checking. Requires authentication.
 
 Prometheus metrics endpoint (no auth required by default).
 
-**Response:** Prometheus text format
+```bash
+curl http://localhost:8083/metrics
+```
 
 **Key Metrics:**
 - `proxychecker_alive_proxies` - Current alive proxy count
@@ -313,36 +246,116 @@ Prometheus metrics endpoint (no auth required by default).
 
 ---
 
-## System Requirements
+## ⚙️ Configuration
+
+### Minimal Configuration
+
+```json
+{
+  "aggregator": {
+    "interval_seconds": 60,
+    "sources": [
+      {
+        "url": "https://raw.githubusercontent.com/TheSpeedX/PROXY-List/master/http.txt",
+        "type": "txt",
+        "enabled": true
+      }
+    ]
+  },
+  "checker": {
+    "timeout_ms": 15000,
+    "concurrency_total": 20000,
+    "test_url": "https://www.google.com/generate_204",
+    "mode": "full-http"
+  },
+  "api": {
+    "addr": ":8083",
+    "api_key_env": "PROXY_API_KEY"
+  }
+}
+```
+
+### Performance Tuning for 12-Thread Server
+
+**Conservative (Low Resource Usage):**
+```json
+{
+  "checker": {
+    "concurrency_total": 10000,
+    "batch_size": 1000,
+    "timeout_ms": 15000
+  }
+}
+```
+
+**Balanced (Recommended):**
+```json
+{
+  "checker": {
+    "concurrency_total": 20000,
+    "batch_size": 2000,
+    "timeout_ms": 15000
+  }
+}
+```
+
+**Aggressive (Maximum Performance):**
+```json
+{
+  "checker": {
+    "concurrency_total": 25000,
+    "batch_size": 2500,
+    "timeout_ms": 12000,
+    "enable_adaptive_concurrency": true
+  }
+}
+```
+
+**Hot Reload Configuration:**
+```bash
+# After editing config.json
+curl -X POST -H "X-Api-Key: $API_KEY" http://localhost:8083/reload
+```
+
+See [config.example.json](config.example.json) for all available options.
+
+---
+
+## 💻 System Requirements
 
 ### Hardware
+
 - **CPU:** 12 threads (6 cores with HT or 12 cores)
 - **RAM:** 4GB minimum, 8GB recommended
 - **Disk:** 10GB available (SSD preferred)
 - **Network:** 1Gbps bandwidth
 
 ### Software
+
 - **OS:** Linux (Ubuntu 20.04+, RHEL 8+, or similar)
-- **Kernel:** 4.15+ (for TCP Fast Open support)
-- **Dependencies:** None (statically compiled binary)
+- **Docker:** 20.10+ (for containerized deployment)
+- **Go:** 1.21+ (for building from source)
 
 ### System Tuning
 
-**Critical:** Set file descriptor limit:
-```bash
-ulimit -n 65535
-```
+The setup script applies these automatically. For manual setup:
 
-**Recommended:** Apply TCP tuning:
 ```bash
+# File descriptor limit (critical)
+ulimit -n 65535
+
+# TCP tuning (recommended)
 sudo sysctl -w net.ipv4.ip_local_port_range="10000 65535"
 sudo sysctl -w net.ipv4.tcp_max_syn_backlog=8192
 sudo sysctl -w net.ipv4.tcp_tw_reuse=1
+sudo sysctl -w net.core.somaxconn=8192
 ```
 
-See `OPS_CHECKLIST.md` for complete tuning guide.
+See [OPS_CHECKLIST.md](OPS_CHECKLIST.md) for complete tuning guide.
 
-## Performance
+---
+
+## 📊 Performance
 
 ### Benchmarks (12-thread server)
 
@@ -358,20 +371,23 @@ See `OPS_CHECKLIST.md` for complete tuning guide.
 - **Latency (p50):** < 5ms
 - **Latency (p99):** < 50ms
 
-## Monitoring
+See [PERFORMANCE_TESTING.md](PERFORMANCE_TESTING.md) for detailed benchmarks.
+
+---
+
+## 📈 Monitoring
 
 ### Prometheus + Grafana
 
 ```bash
 # Start with monitoring stack
-docker-compose --profile monitoring up -d
+docker compose --profile monitoring up -d
 
-# Access Grafana
-open http://localhost:3000
-# Login: admin / admin
+# Access Grafana at http://localhost:3000
+# Default credentials: admin / admin
 ```
 
-### Key Metrics to Watch
+### Key Metrics
 
 ```promql
 # Proxy availability
@@ -387,16 +403,159 @@ rate(proxychecker_checks_success_total[5m]) / rate(proxychecker_checks_total[5m]
 histogram_quantile(0.99, rate(proxychecker_api_request_duration_seconds_bucket[5m]))
 ```
 
-### Alerts
+### Pre-configured Alerts
 
-Pre-configured alerts (see `alerts.yml`):
-- No alive proxies (critical)
-- Low proxy count (warning)
-- High check failure rate (warning)
-- High API latency (warning)
-- Service down (critical)
+- 🔴 **Critical:** No alive proxies
+- 🔴 **Critical:** Service down
+- 🟡 **Warning:** Low proxy count (< 100)
+- 🟡 **Warning:** High check failure rate (> 80%)
+- 🟡 **Warning:** High API latency (> 100ms)
 
-## Deployment
+See [alerts.yml](alerts.yml) for configuration.
+
+---
+
+## 🐛 Troubleshooting
+
+### Docker-Compose Error
+
+**Error:** `URLSchemeUnknown: Not supported URL scheme http+docker`
+
+**Quick Fix:**
+```bash
+sudo bash setup-ubuntu.sh
+```
+
+**Manual Fix:**
+```bash
+# Remove old Python-based docker-compose
+sudo apt-get remove docker-compose
+
+# Install Docker Compose Plugin v2
+sudo apt-get install docker-compose-plugin
+
+# Use 'docker compose' (with space, not hyphen)
+docker compose up -d
+```
+
+📖 **See [DOCKER_FIX.md](DOCKER_FIX.md) for detailed solutions**
+
+---
+
+### No Proxies Available
+
+```bash
+# Wait 1-2 minutes for first check cycle
+sleep 120
+
+# Check statistics
+API_KEY=$(grep PROXY_API_KEY .env | cut -d= -f2)
+curl -H "X-Api-Key: $API_KEY" http://localhost:8083/stat | jq
+
+# Trigger manual reload
+curl -X POST -H "X-Api-Key: $API_KEY" http://localhost:8083/reload
+```
+
+---
+
+### Service Won't Start
+
+```bash
+# Check logs
+docker compose logs proxy-checker --tail=50
+
+# Verify config exists
+cp config.example.json config.json
+
+# Rebuild and restart
+docker compose down
+docker compose build --no-cache
+docker compose up -d
+```
+
+---
+
+### High CPU/Memory Usage
+
+Edit `config.json` to reduce concurrency:
+
+```json
+{
+  "checker": {
+    "concurrency_total": 10000,
+    "batch_size": 1000
+  }
+}
+```
+
+Then restart:
+```bash
+docker compose restart proxy-checker
+```
+
+---
+
+### 401 Unauthorized
+
+```bash
+# Check your API key
+cat .env | grep PROXY_API_KEY
+
+# Use it in requests
+API_KEY="your-actual-key"
+curl -H "X-Api-Key: $API_KEY" http://localhost:8083/stat
+```
+
+---
+
+📖 **For complete troubleshooting, see [TROUBLESHOOTING.md](TROUBLESHOOTING.md)**
+
+---
+
+## 🏗️ Architecture
+
+```
+┌─────────────────────────────────────────┐
+│         HTTP API (Gin)                  │
+│  /get-proxy  /stat  /health  /metrics   │
+└───────────────┬─────────────────────────┘
+                │
+                ▼
+┌───────────────────────────────────────────┐
+│     Atomic Snapshot (atomic.Value)        │
+│     • Lock-free reads                     │
+│     • Atomic pointer swap on update       │
+└───────────────┬───────────────────────────┘
+                │
+                ▼
+┌───────────────────────────────────────────┐
+│     Checker (20k goroutines)              │
+│     • Semaphore-based concurrency         │
+│     • HTTP transport with netpoll         │
+│     • Adaptive backpressure               │
+└───────────────┬───────────────────────────┘
+                │
+                ▼
+┌───────────────────────────────────────────┐
+│     Aggregator                            │
+│     • Concurrent source fetching          │
+│     • Deduplication                       │
+│     • Error handling                      │
+└───────────────────────────────────────────┘
+```
+
+**Key Design Principles:**
+- **Zero-downtime updates** via atomic pointer swaps
+- **Lock-free reads** for maximum throughput
+- **Adaptive concurrency** to prevent resource exhaustion
+- **Graceful degradation** under high load
+- **Observable** via Prometheus metrics
+
+See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed documentation.
+
+---
+
+## 🚢 Deployment
 
 ### Docker Compose (Production)
 
@@ -468,163 +627,125 @@ spec:
               key: api-key
 ```
 
-## Testing
+See [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md) for step-by-step instructions.
+
+---
+
+## 🧪 Testing
 
 ### Unit Tests
+
 ```bash
 go test ./internal/... -v -race
 ```
 
 ### Integration Tests
+
 ```bash
 go test ./tests/integration/... -v
 ```
 
-### End-to-End Smoke Test
+### End-to-End Tests
+
 ```bash
 bash tests/e2e/smoke_test.sh
 ```
 
-### Performance Test
+### Performance Tests
+
 ```bash
 bash benchmark.sh
 ```
 
-See `TESTS.md` for complete testing documentation.
-
-## Troubleshooting
-
-**Common Issues:**
-
-### Docker-Compose Error: `URLSchemeUnknown: Not supported URL scheme http+docker`
-
-**Quick Fix:**
-```bash
-sudo bash setup-ubuntu.sh
-```
-
-**Manual Fix:**
-```bash
-# Install Docker Compose v2 Plugin
-sudo apt-get remove docker-compose
-sudo apt-get install docker-compose-plugin
-
-# Use 'docker compose' (with space)
-docker compose up -d
-```
-
-See **[DOCKER_FIX.md](DOCKER_FIX.md)** for detailed solutions.
-
-### No proxies available
-
-```bash
-# Wait 1-2 minutes for first check, then:
-API_KEY=$(grep PROXY_API_KEY .env | cut -d= -f2)
-curl -H "X-Api-Key: $API_KEY" http://localhost:8083/stat | jq
-
-# Trigger manual reload
-curl -X POST -H "X-Api-Key: $API_KEY" http://localhost:8083/reload
-```
-
-### Service won't start
-
-```bash
-# Check logs
-docker compose logs proxy-checker --tail=50
-
-# Verify config.json exists
-cp config.example.json config.json
-
-# Rebuild and restart
-docker compose down
-docker compose build --no-cache
-docker compose up -d
-```
-
-### High CPU/Memory usage
-
-Reduce concurrency in `config.json`:
-```json
-{
-  "checker": {
-    "concurrency_total": 10000,
-    "batch_size": 1000
-  }
-}
-```
-
-**For complete troubleshooting guide, see [TROUBLESHOOTING.md](TROUBLESHOOTING.md)**
-
-**For Docker-specific issues, see [DOCKER_FIX.md](DOCKER_FIX.md)**
-
-**For production setup, see [OPS_CHECKLIST.md](OPS_CHECKLIST.md)**
-
-## Architecture
-
-```
-┌─────────────────────────────────────────┐
-│         HTTP API (Gin)                  │
-│  /get-proxy  /stat  /health  /metrics   │
-└───────────────┬─────────────────────────┘
-                │
-                ▼
-┌───────────────────────────────────────────┐
-│     Atomic Snapshot (atomic.Value)        │
-│     - Lock-free reads                     │
-│     - Atomic pointer swap on update       │
-└───────────────┬───────────────────────────┘
-                │
-                ▼
-┌───────────────────────────────────────────┐
-│     Checker (20k goroutines)              │
-│     - Semaphore-based concurrency         │
-│     - HTTP transport with netpoll         │
-│     - Adaptive backpressure               │
-└───────────────┬───────────────────────────┘
-                │
-                ▼
-┌───────────────────────────────────────────┐
-│     Aggregator                            │
-│     - Concurrent source fetching          │
-│     - Deduplication                       │
-│     - Error handling                      │
-└───────────────────────────────────────────┘
-```
-
-See `ARCHITECTURE.md` for detailed architecture documentation.
-
-## Contributing
-
-Contributions welcome! Please:
-1. Fork the repository
-2. Create a feature branch
-3. Add tests for new functionality
-4. Ensure all tests pass
-5. Submit a pull request
-
-## License
-
-MIT License - see LICENSE file for details
-
-## Support
-
-- **Documentation:** See docs in repository
-- **Issues:** GitHub Issues
-- **Performance:** See PERFORMANCE_TESTING.md
-- **Operations:** See OPS_CHECKLIST.md
-
-## Acknowledgments
-
-Built with:
-- [Gin](https://github.com/gin-gonic/gin) - HTTP framework
-- [Prometheus](https://prometheus.io/) - Metrics
-- [Go](https://golang.org/) - Language runtime
-
-## Version
-
-Current version: 1.0.0
+See [TESTS.md](TESTS.md) for complete testing documentation.
 
 ---
 
+## 📚 Documentation
+
+### Quick Reference
+- **[START_HERE.txt](START_HERE.txt)** - Quick start guide (plain text)
+- **[QUICKREF.md](QUICKREF.md)** - Command reference card
+
+### Setup & Deployment
+- **[DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md)** - Complete deployment walkthrough
+- **[DOCKER_FIX.md](DOCKER_FIX.md)** - Fix docker-compose issues
+- **[setup-ubuntu.sh](setup-ubuntu.sh)** - Automated setup script
+
+### Troubleshooting & Operations
+- **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** - Complete troubleshooting guide
+- **[OPS_CHECKLIST.md](OPS_CHECKLIST.md)** - Production operations guide
+
+### Technical Documentation
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** - System architecture details
+- **[PERFORMANCE_TESTING.md](PERFORMANCE_TESTING.md)** - Performance benchmarks
+- **[TESTS.md](TESTS.md)** - Testing documentation
+- **[FIXES_APPLIED.md](FIXES_APPLIED.md)** - Recent fixes and changes
+
+---
+
+## 🤝 Contributing
+
+Contributions are welcome! Please:
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Add tests for new functionality
+4. Ensure all tests pass (`go test ./...`)
+5. Commit your changes (`git commit -m 'Add amazing feature'`)
+6. Push to the branch (`git push origin feature/amazing-feature`)
+7. Open a Pull Request
+
+---
+
+## 📝 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+---
+
+## 🙏 Acknowledgments
+
+Built with excellent open-source tools:
+
+- [Go](https://golang.org/) - Programming language
+- [Gin](https://github.com/gin-gonic/gin) - HTTP web framework
+- [Prometheus](https://prometheus.io/) - Metrics and monitoring
+- [Redis](https://redis.io/) - Optional storage backend
+- [Docker](https://www.docker.com/) - Containerization
+
+---
+
+## 📞 Support
+
+- 🐛 **Bug Reports:** [GitHub Issues](https://github.com/yourusername/proxy-checker-api/issues)
+- 💬 **Questions:** [GitHub Discussions](https://github.com/yourusername/proxy-checker-api/discussions)
+- 📖 **Documentation:** See [docs](#documentation) above
+- ⚡ **Quick Setup:** Run `sudo bash setup-ubuntu.sh`
+
+---
+
+## 📈 Version
+
+**Current Version:** 1.0.0
+
+**What's New:**
+- ✅ Fixed docker-compose compatibility issues
+- ✅ Standardized ports (now consistent on 8083)
+- ✅ Added automated setup script
+- ✅ Comprehensive documentation
+- ✅ Enhanced troubleshooting guides
+
+See [FIXES_APPLIED.md](FIXES_APPLIED.md) for complete changelog.
+
+---
+
+<div align="center">
+
 **Production-Ready** • **High-Performance** • **Well-Documented** • **Fully Tested**
 
+Made with ❤️ for the proxy community
+
+⭐ **Star this repo if you find it helpful!** ⭐
+
+</div>
