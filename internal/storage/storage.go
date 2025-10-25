@@ -6,12 +6,12 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/proxy-checker-api/internal/snapshot"
+	"github.com/proxy-checker-api/internal/types"
 )
 
 type Storage interface {
-	Save(snapshot *snapshot.Snapshot) error
-	Load() (*snapshot.Snapshot, error)
+	Save(snapshot *types.Snapshot) error
+	Load() (*types.Snapshot, error)
 	Close() error
 }
 
@@ -43,7 +43,7 @@ func NewFileStorage(path string) (*FileStorage, error) {
 	return &FileStorage{path: path}, nil
 }
 
-func (f *FileStorage) Save(snapshot *snapshot.Snapshot) error {
+func (f *FileStorage) Save(snapshot *types.Snapshot) error {
 	data, err := json.MarshalIndent(snapshot, "", "  ")
 	if err != nil {
 		return fmt.Errorf("marshal JSON: %w", err)
@@ -62,7 +62,7 @@ func (f *FileStorage) Save(snapshot *snapshot.Snapshot) error {
 	return nil
 }
 
-func (f *FileStorage) Load() (*snapshot.Snapshot, error) {
+func (f *FileStorage) Load() (*types.Snapshot, error) {
 	data, err := os.ReadFile(f.path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -71,7 +71,7 @@ func (f *FileStorage) Load() (*snapshot.Snapshot, error) {
 		return nil, fmt.Errorf("read file: %w", err)
 	}
 
-	var snap snapshot.Snapshot
+	var snap types.Snapshot
 	if err := json.Unmarshal(data, &snap); err != nil {
 		return nil, fmt.Errorf("unmarshal JSON: %w", err)
 	}

@@ -7,7 +7,7 @@ import (
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
-	"github.com/proxy-checker-api/internal/snapshot"
+	"github.com/proxy-checker-api/internal/types"
 )
 
 type SQLiteStorage struct {
@@ -35,7 +35,7 @@ func NewSQLiteStorage(path string) (*SQLiteStorage, error) {
 	return &SQLiteStorage{db: db}, nil
 }
 
-func (s *SQLiteStorage) Save(snapshot *snapshot.Snapshot) error {
+func (s *SQLiteStorage) Save(snapshot *types.Snapshot) error {
 	data, err := json.Marshal(snapshot)
 	if err != nil {
 		return fmt.Errorf("marshal JSON: %w", err)
@@ -64,7 +64,7 @@ func (s *SQLiteStorage) Save(snapshot *snapshot.Snapshot) error {
 	return nil
 }
 
-func (s *SQLiteStorage) Load() (*snapshot.Snapshot, error) {
+func (s *SQLiteStorage) Load() (*types.Snapshot, error) {
 	var data string
 	err := s.db.QueryRow("SELECT data FROM snapshots ORDER BY id DESC LIMIT 1").Scan(&data)
 	if err != nil {
@@ -74,7 +74,7 @@ func (s *SQLiteStorage) Load() (*snapshot.Snapshot, error) {
 		return nil, fmt.Errorf("query snapshot: %w", err)
 	}
 
-	var snap snapshot.Snapshot
+	var snap types.Snapshot
 	if err := json.Unmarshal([]byte(data), &snap); err != nil {
 		return nil, fmt.Errorf("unmarshal JSON: %w", err)
 	}

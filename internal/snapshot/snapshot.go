@@ -7,30 +7,14 @@ import (
 	"time"
 
 	"github.com/proxy-checker-api/internal/storage"
+	"github.com/proxy-checker-api/internal/types"
 	log "github.com/sirupsen/logrus"
 )
 
-type Proxy struct {
-	Address   string    `json:"address"`
-	Alive     bool      `json:"alive"`
-	LatencyMs int64     `json:"latency_ms"`
-	LastCheck time.Time `json:"last_check"`
-}
-
-type Stats struct {
-	TotalScraped  int                       `json:"total_scraped"`
-	TotalAlive    int                       `json:"total_alive"`
-	TotalDead     int                       `json:"total_dead"`
-	AlivePercent  float64                   `json:"alive_percent"`
-	LastCheckTime time.Time                 `json:"last_check_time"`
-	SourceStats   map[string]interface{}    `json:"source_stats,omitempty"`
-}
-
-type Snapshot struct {
-	Proxies []Proxy   `json:"proxies"`
-	Stats   Stats     `json:"stats"`
-	Updated time.Time `json:"updated"`
-}
+// Re-export types for backward compatibility
+type Proxy = types.Proxy
+type Stats = types.Stats
+type Snapshot = types.Snapshot
 
 type Manager struct {
 	current   atomic.Value // stores *Snapshot
@@ -50,9 +34,9 @@ func NewManager(store storage.Storage, persistIntervalSeconds int) *Manager {
 	}
 
 	// Initialize with empty snapshot
-	m.current.Store(&Snapshot{
-		Proxies: []Proxy{},
-		Stats:   Stats{},
+	m.current.Store(&types.Snapshot{
+		Proxies: []types.Proxy{},
+		Stats:   types.Stats{},
 		Updated: time.Now(),
 	})
 
@@ -65,8 +49,8 @@ func NewManager(store storage.Storage, persistIntervalSeconds int) *Manager {
 }
 
 // Update atomically swaps the current snapshot
-func (m *Manager) Update(proxies []Proxy, stats Stats) {
-	snapshot := &Snapshot{
+func (m *Manager) Update(proxies []types.Proxy, stats types.Stats) {
+	snapshot := &types.Snapshot{
 		Proxies: proxies,
 		Stats:   stats,
 		Updated: time.Now(),
@@ -80,15 +64,15 @@ func (m *Manager) Update(proxies []Proxy, stats Stats) {
 }
 
 // Get returns the current snapshot (atomic read)
-func (m *Manager) Get() *Snapshot {
-	return m.current.Load().(*Snapshot)
+func (m *Manager) Get() *types.Snapshot {
+	return m.current.Load().(*types.Snapshot)
 }
 
 // GetProxy returns a single proxy using round-robin
-func (m *Manager) GetProxy() (Proxy, bool) {
+func (m *Manager) GetProxy() (types.Proxy, bool) {
 	snapshot := m.Get()
 	if len(snapshot.Proxies) == 0 {
-		return Proxy{}, false
+		return types.Proxy{}, false
 	}
 
 	// Round-robin selection
@@ -97,19 +81,19 @@ func (m *Manager) GetProxy() (Proxy, bool) {
 }
 
 // GetProxies returns N proxies (round-robin or random)
-func (m *Manager) GetProxies(n int) []Proxy {
+func (m *Manager) GetProxies(n int) []types.Proxy {
 	snapshot := m.Get()
 	total := len(snapshot.Proxies)
 
 	if total == 0 {
-		return []Proxy{}
+		return []types.Proxy{}
 	}
 
 	if n <= 0 || n > total {
 		n = total
 	}
 
-	result := make([]Proxy, n)
+	result := make([]types.Proxy, n)
 	
 	// Use round-robin for small requests
 	if n <= 10 {
@@ -131,22 +115,22 @@ func (m *Manager) GetProxies(n int) []Proxy {
 }
 
 // GetAll returns all proxies
-func (m *Manager) GetAll() []Proxy {
+func (m *Manager) GetAll() []types.Proxy {
 	snapshot := m.Get()
 	// Return copy to prevent external modifications
-	proxies := make([]Proxy, len(snapshot.Proxies))
+	proxies := make([]types.Proxy, len(snapshot.Proxies))
 	copy(proxies, snapshot.Proxies)
 	return proxies
 }
 
 // GetStats returns current statistics
-func (m *Manager) GetStats() Stats {
+func (m *Manager) GetStats() types.Stats {
 	snapshot := m.Get()
 	return snapshot.Stats
 }
 
 // persist saves snapshot to storage (non-blocking)
-func (m *Manager) persist(snapshot *Snapshot) {
+func (m *Manager) persist(snapshot *types.Snapshot) {
 	m.persistMu.Lock()
 	defer m.persistMu.Unlock()
 

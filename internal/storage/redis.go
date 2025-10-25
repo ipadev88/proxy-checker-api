@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/proxy-checker-api/internal/snapshot"
+	"github.com/proxy-checker-api/internal/types"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -38,7 +38,7 @@ func NewRedisStorage(addr string) (*RedisStorage, error) {
 	}, nil
 }
 
-func (r *RedisStorage) Save(snapshot *snapshot.Snapshot) error {
+func (r *RedisStorage) Save(snapshot *types.Snapshot) error {
 	data, err := json.Marshal(snapshot)
 	if err != nil {
 		return fmt.Errorf("marshal JSON: %w", err)
@@ -54,7 +54,7 @@ func (r *RedisStorage) Save(snapshot *snapshot.Snapshot) error {
 	return nil
 }
 
-func (r *RedisStorage) Load() (*snapshot.Snapshot, error) {
+func (r *RedisStorage) Load() (*types.Snapshot, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -66,7 +66,7 @@ func (r *RedisStorage) Load() (*snapshot.Snapshot, error) {
 		return nil, fmt.Errorf("redis get: %w", err)
 	}
 
-	var snap snapshot.Snapshot
+	var snap types.Snapshot
 	if err := json.Unmarshal([]byte(data), &snap); err != nil {
 		return nil, fmt.Errorf("unmarshal JSON: %w", err)
 	}

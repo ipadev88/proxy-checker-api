@@ -6,13 +6,11 @@ RUN apk add --no-cache git gcc musl-dev sqlite-dev
 
 WORKDIR /build
 
-# Copy go mod files
-COPY go.mod ./
-# Download dependencies (go.sum will be generated automatically)
-RUN go mod download
-
-# Copy source code
+# Copy source code first (needed for local module resolution)
 COPY . .
+
+# Initialize and download dependencies
+RUN go mod tidy && go mod download
 
 # Build with optimizations
 RUN CGO_ENABLED=1 GOOS=linux go build -a \
