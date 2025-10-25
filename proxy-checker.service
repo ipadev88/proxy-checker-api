@@ -1,6 +1,6 @@
 [Unit]
 Description=Proxy Checker Service
-Documentation=https://github.com/your-org/proxy-checker-api
+Documentation=https://github.com/ipadev88/proxy-checker-api
 After=network-online.target
 Wants=network-online.target
 

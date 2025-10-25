@@ -7,22 +7,23 @@ RUN apk add --no-cache git gcc musl-dev sqlite-dev
 WORKDIR /build
 
 # Copy go mod files
-COPY go.mod go.sum ./
+COPY go.mod ./
+# Download dependencies (go.sum will be generated automatically)
 RUN go mod download
 
 # Copy source code
 COPY . .
 
 # Build with optimizations
-RUN CGO_ENABLED=1 GOOS=linux go build -a -installsuffix cgo \
-    -ldflags="-s -w -extldflags '-static'" \
+RUN CGO_ENABLED=1 GOOS=linux go build -a \
+    -ldflags="-s -w" \
     -o proxy-checker ./cmd/main.go
 
 # Final stage
 FROM alpine:latest
 
 # Install runtime dependencies
-RUN apk --no-cache add ca-certificates tzdata
+RUN apk --no-cache add ca-certificates tzdata wget
 
 # Create non-root user
 RUN addgroup -g 1000 proxychecker && \
