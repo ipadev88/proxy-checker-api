@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/proxy-checker-api/internal/config"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -139,29 +140,29 @@ func CreateBlacklistFile(path string) error {
 }
 
 // ValidateConfig performs safety checks on zmap configuration
-func ValidateConfig(config ZmapConfig) error {
+func ValidateConfig(cfg config.ZmapConfig) error {
 	// Check rate limit is reasonable
-	if config.RateLimit > 50000 {
-		log.Warnf("High rate limit detected: %d pps", config.RateLimit)
+	if cfg.RateLimit > 50000 {
+		log.Warnf("High rate limit detected: %d pps", cfg.RateLimit)
 		log.Warn("High scan rates may trigger network security alerts")
 		log.Warn("Consider using a lower rate (10000-25000 pps)")
 	}
 
 	// Warn if no blacklist specified
-	if len(config.Blacklist) == 0 {
+	if len(cfg.Blacklist) == 0 {
 		log.Warn("No blacklist files specified in config")
 		log.Warn("Private and reserved IP ranges will not be automatically excluded")
 		log.Warn("Add blacklist files to config.zmap.blacklist")
 	}
 
 	// Check cooldown is reasonable
-	if config.CooldownSeconds < 300 {
-		log.Warnf("Short cooldown period: %d seconds", config.CooldownSeconds)
+	if cfg.CooldownSeconds < 300 {
+		log.Warnf("Short cooldown period: %d seconds", cfg.CooldownSeconds)
 		log.Warn("Frequent scans may be flagged as malicious. Recommended: 3600s (1 hour)")
 	}
 
 	// Validate target ranges
-	if err := ValidateTargets(config.TargetRanges); err != nil {
+	if err := ValidateTargets(cfg.TargetRanges); err != nil {
 		return fmt.Errorf("invalid target ranges: %w", err)
 	}
 

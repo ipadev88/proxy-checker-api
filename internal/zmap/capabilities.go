@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/proxy-checker-api/internal/config"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -84,9 +85,9 @@ func CheckZmapBinary(path string) error {
 }
 
 // VerifyZmapSetup performs complete verification of zmap setup
-func VerifyZmapSetup(config ZmapConfig) error {
+func VerifyZmapSetup(cfg config.ZmapConfig) error {
 	// Check binary
-	if err := CheckZmapBinary(config.ZmapBinary); err != nil {
+	if err := CheckZmapBinary(cfg.ZmapBinary); err != nil {
 		return fmt.Errorf("binary check failed: %w", err)
 	}
 
@@ -96,7 +97,7 @@ func VerifyZmapSetup(config ZmapConfig) error {
 	}
 
 	// Check blacklist files exist
-	for _, blacklist := range config.Blacklist {
+	for _, blacklist := range cfg.Blacklist {
 		if _, err := os.Stat(blacklist); err != nil {
 			log.Warnf("Blacklist file not found (will proceed without it): %s", blacklist)
 		} else {
@@ -105,19 +106,19 @@ func VerifyZmapSetup(config ZmapConfig) error {
 	}
 
 	// Validate ports
-	if len(config.Ports) == 0 {
+	if len(cfg.Ports) == 0 {
 		return fmt.Errorf("no ports configured for scanning")
 	}
 
-	for _, port := range config.Ports {
+	for _, port := range cfg.Ports {
 		if port < 1 || port > 65535 {
 			return fmt.Errorf("invalid port number: %d (must be 1-65535)", port)
 		}
 	}
 
 	// Validate rate limit
-	if config.RateLimit < 1 || config.RateLimit > 1000000 {
-		return fmt.Errorf("invalid rate_limit: %d (must be 1-1000000)", config.RateLimit)
+	if cfg.RateLimit < 1 || cfg.RateLimit > 1000000 {
+		return fmt.Errorf("invalid rate_limit: %d (must be 1-1000000)", cfg.RateLimit)
 	}
 
 	log.Info("Zmap setup verification passed")

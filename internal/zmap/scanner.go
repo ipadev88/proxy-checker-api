@@ -12,12 +12,13 @@ import (
 	"time"
 
 	"github.com/proxy-checker-api/internal/aggregator"
+	"github.com/proxy-checker-api/internal/config"
 	"github.com/proxy-checker-api/internal/metrics"
 	log "github.com/sirupsen/logrus"
 )
 
 type ZmapScanner struct {
-	config       ZmapConfig
+	config       config.ZmapConfig
 	metrics      *metrics.Collector
 	mu           sync.RWMutex
 	lastScanTime time.Time
@@ -26,22 +27,7 @@ type ZmapScanner struct {
 	totalScans   int64
 }
 
-type ZmapConfig struct {
-	Enabled           bool     `json:"enabled"`
-	Ports             []int    `json:"ports"`
-	RateLimit         int      `json:"rate_limit"`
-	Bandwidth         string   `json:"bandwidth"`
-	MaxRuntimeSeconds int      `json:"max_runtime_seconds"`
-	TargetRanges      []string `json:"target_ranges"`
-	Blacklist         []string `json:"blacklist"`
-	Interface         string   `json:"interface"`
-	ZmapBinary        string   `json:"zmap_binary"`
-	OutputFormat      string   `json:"output_format"`
-	ZmapExtraArgs     []string `json:"zmap_extra_args"`
-	CooldownSeconds   int      `json:"cooldown_seconds"`
-}
-
-func NewZmapScanner(cfg ZmapConfig, metricsCollector *metrics.Collector) *ZmapScanner {
+func NewZmapScanner(cfg config.ZmapConfig, metricsCollector *metrics.Collector) *ZmapScanner {
 	return &ZmapScanner{
 		config:  cfg,
 		metrics: metricsCollector,
