@@ -377,14 +377,22 @@ func (s *Server) handleReload(c *gin.Context) {
 		ctx := context.Background()
 
 		// Re-aggregate
-		proxies, sourceStats, err := s.aggregator.Aggregate(ctx)
+		proxiesWithProto, sourceStats, err := s.aggregator.Aggregate(ctx)
 		if err != nil {
 			log.Errorf("Reload aggregation failed: %v", err)
 			return
 		}
 
+		// Extract addresses and create protocol map
+		addresses := make([]string, len(proxiesWithProto))
+		protocolMap := make(map[string]string)
+		for i, p := range proxiesWithProto {
+			addresses[i] = p.Address
+			protocolMap[p.Address] = p.Protocol
+		}
+
 		// Re-check
-		results := s.checker.CheckProxies(ctx, proxies)
+		results := s.checker.CheckProxies(ctx, addresses)
 
 		aliveCount := 0
 		aliveProxies := make([]snapshot.Proxy, 0)
@@ -392,8 +400,13 @@ func (s *Server) handleReload(c *gin.Context) {
 		for _, result := range results {
 			if result.Alive {
 				aliveCount++
+				protocol := protocolMap[result.Proxy]
+				if protocol == "" {
+					protocol = "http" // default
+				}
 				aliveProxies = append(aliveProxies, snapshot.Proxy{
 					Address:   result.Proxy,
+					Protocol:  protocol,
 					Alive:     true,
 					LatencyMs: result.LatencyMs,
 					LastCheck: time.Now(),
@@ -402,10 +415,10 @@ func (s *Server) handleReload(c *gin.Context) {
 		}
 
 		stats := snapshot.Stats{
-			TotalScraped:  len(proxies),
+			TotalScraped:  len(proxiesWithProto),
 			TotalAlive:    aliveCount,
-			TotalDead:     len(proxies) - aliveCount,
-			AlivePercent:  float64(aliveCount) / float64(len(proxies)) * 100.0,
+			TotalDead:     len(proxiesWithProto) - aliveCount,
+			AlivePercent:  float64(aliveCount) / float64(len(proxiesWithProto)) * 100.0,
 			LastCheckTime: time.Now(),
 			SourceStats:   sourceStats,
 		}
