@@ -91,34 +91,10 @@ fi
 ZMAP_VERSION=$(zmap --version 2>&1 | head -n1)
 echo -e "${GREEN}✓ Zmap installed: ${ZMAP_VERSION}${NC}"
 
-# Create directories for zmap
+# Create directories for zmap (for future configs/logs)
 mkdir -p /etc/proxy-checker
 mkdir -p /var/log/proxy-checker
-
-# Download zmap blacklist
-echo "Downloading zmap blacklist..."
-BLACKLIST_URL="https://raw.githubusercontent.com/zmap/zmap/master/conf/blacklist.conf"
-BLACKLIST_FILE="/etc/proxy-checker/blacklist.txt"
-
-if curl -f -s -o "$BLACKLIST_FILE" "$BLACKLIST_URL" 2>/dev/null; then
-    BLACKLIST_COUNT=$(grep -c -v "^#" "$BLACKLIST_FILE" || echo "0")
-    echo -e "${GREEN}✓ Blacklist downloaded: ${BLACKLIST_COUNT} CIDR ranges${NC}"
-else
-    echo -e "${YELLOW}⚠ GitHub blacklist unavailable, creating basic blacklist...${NC}"
-    cat > "$BLACKLIST_FILE" <<'BLACKLIST_EOF'
-# Zmap Blacklist - Basic Configuration
-# Private and reserved IP ranges
-10.0.0.0/8
-172.16.0.0/12
-192.168.0.0/16
-127.0.0.0/8
-169.254.0.0/16
-224.0.0.0/4
-240.0.0.0/4
-255.255.255.255/32
-BLACKLIST_EOF
-    echo -e "${GREEN}✓ Basic blacklist created${NC}"
-fi
+echo -e "${GREEN}✓ Directories created${NC}"
 
 # Set capabilities on zmap binary
 echo "Setting capabilities on zmap..."
@@ -318,7 +294,7 @@ echo ""
 
 echo -e "${BLUE}🚀 Zmap Integration:${NC}"
 echo -e "  • Zmap is ${GREEN}ENABLED${NC} by default (ports 8080, 80, 3128)"
-echo -e "  • Blacklist: ${BLACKLIST_FILE}"
+echo -e "  • No blacklist - scans entire internet at 7000 pps"
 echo -e "  • Expected: ${GREEN}10-20x more working proxies!${NC}"
 echo -e "  • First zmap scan will take ~30-40 minutes"
 echo ""

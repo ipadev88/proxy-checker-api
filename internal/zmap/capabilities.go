@@ -96,15 +96,6 @@ func VerifyZmapSetup(cfg config.ZmapConfig) error {
 		return fmt.Errorf("capability check failed: %w", err)
 	}
 
-	// Check blacklist files exist
-	for _, blacklist := range cfg.Blacklist {
-		if _, err := os.Stat(blacklist); err != nil {
-			log.Warnf("Blacklist file not found (will proceed without it): %s", blacklist)
-		} else {
-			log.Infof("Blacklist file found: %s", blacklist)
-		}
-	}
-
 	// Validate ports
 	if len(cfg.Ports) == 0 {
 		return fmt.Errorf("no ports configured for scanning")

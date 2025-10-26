@@ -194,12 +194,12 @@ func (z *ZmapScanner) buildZmapCmd(port int, outputFile string) *exec.Cmd {
 		args = append(args, "-T", fmt.Sprintf("%d", z.config.MaxRuntimeSeconds))
 	}
 
-	// Add blacklist files
+	// Add blacklist files (optional)
 	for _, blacklist := range z.config.Blacklist {
-		if _, err := os.Stat(blacklist); err == nil {
-			args = append(args, "-b", blacklist)
-		} else {
-			log.Warnf("Blacklist file not found: %s", blacklist)
+		if blacklist != "" {
+			if _, err := os.Stat(blacklist); err == nil {
+				args = append(args, "-b", blacklist)
+			}
 		}
 	}
 
@@ -219,6 +219,8 @@ func (z *ZmapScanner) buildZmapCmd(port int, outputFile string) *exec.Cmd {
 		log.Warn("⚠️  No target ranges specified - zmap will scan ENTIRE INTERNET")
 		log.Warn("⚠️  This may be ILLEGAL without authorization")
 		log.Warn("⚠️  This may take hours and use significant bandwidth")
+		// Add 0.0.0.0/0 to scan entire internet (required by zmap)
+		args = append(args, "0.0.0.0/0")
 	}
 
 	return exec.Command(args[0], args[1:]...)

@@ -27,16 +27,6 @@ RUN apk --no-cache add ca-certificates tzdata wget zmap libpcap-dev
 RUN addgroup -g 1000 proxychecker && \
     adduser -D -u 1000 -G proxychecker proxychecker
 
-# Create blacklist directory and download blacklist
-RUN mkdir -p /etc/proxy-checker && \
-    wget -q -O /etc/proxy-checker/blacklist.txt https://raw.githubusercontent.com/zmap/zmap/master/conf/blacklist.conf || \
-    (echo "0.0.0.0/8" > /etc/proxy-checker/blacklist.txt && \
-     echo "10.0.0.0/8" >> /etc/proxy-checker/blacklist.txt && \
-     echo "127.0.0.0/8" >> /etc/proxy-checker/blacklist.txt && \
-     echo "169.254.0.0/16" >> /etc/proxy-checker/blacklist.txt && \
-     echo "172.16.0.0/12" >> /etc/proxy-checker/blacklist.txt && \
-     echo "192.168.0.0/16" >> /etc/proxy-checker/blacklist.txt)
-
 WORKDIR /app
 
 # Copy binary from builder
