@@ -33,8 +33,9 @@ WORKDIR /app
 COPY --from=builder /build/proxy-checker .
 COPY --from=builder /build/config.example.json ./config.json
 
-# Create data directory
-RUN mkdir -p /data && chown -R proxychecker:proxychecker /data /app
+# Create directories
+RUN mkdir -p /data /etc/proxy-checker && \
+    chown -R proxychecker:proxychecker /data /app
 
 # Note: zmap needs root/capabilities - running as root for zmap support
 # Switch to non-root user (commented out for zmap)

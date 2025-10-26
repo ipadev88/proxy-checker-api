@@ -91,7 +91,7 @@ fi
 ZMAP_VERSION=$(zmap --version 2>&1 | head -n1)
 echo -e "${GREEN}✓ Zmap installed: ${ZMAP_VERSION}${NC}"
 
-# Create directories for zmap (for future configs/logs)
+# Create directories for zmap
 mkdir -p /etc/proxy-checker
 mkdir -p /var/log/proxy-checker
 echo -e "${GREEN}✓ Directories created${NC}"
@@ -293,10 +293,10 @@ echo "  docker compose up -d"
 echo ""
 
 echo -e "${BLUE}🚀 Zmap Integration:${NC}"
-echo -e "  • Zmap is ${GREEN}ENABLED${NC} by default (ports 8080, 80, 3128)"
-echo -e "  • No blacklist - scans entire internet at 7000 pps"
-echo -e "  • Expected: ${GREEN}10-20x more working proxies!${NC}"
-echo -e "  • First zmap scan will take ~30-40 minutes"
+echo -e "  • Zmap is ${GREEN}ENABLED${NC} by default (ports 8080, 80)"
+echo -e "  • Scan time: ${GREEN}10 minutes${NC} per cycle (repeats every 30 min)"
+echo -e "  • Expected: ${GREEN}~500-800 fresh proxies per scan!${NC}"
+echo -e "  • Rate: 8000 pps, no blacklist (full internet)"
 echo ""
 echo -e "${YELLOW}Note:${NC} Wait 1-2 minutes for the first proxy check cycle to complete."
 echo "Then test the API endpoints above."

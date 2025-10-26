@@ -6,6 +6,7 @@ import "time"
 type Proxy struct {
 	Address   string    `json:"address"`
 	Protocol  string    `json:"protocol"`  // "http", "socks4", "socks5"
+	Source    string    `json:"source"`    // "scraped", "zmap"
 	Alive     bool      `json:"alive"`
 	LatencyMs int64     `json:"latency_ms"`
 	LastCheck time.Time `json:"last_check"`

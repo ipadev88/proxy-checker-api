@@ -329,6 +329,52 @@ func (s *Server) handleStat(c *gin.Context) {
 	stats := s.snapshot.GetStats()
 	snap := s.snapshot.Get()
 
+	// Calculate protocol and source statistics
+	protocolStats := make(map[string]int)
+	
+	// Source-based statistics
+	scrapedTotal := 0
+	scrapedAlive := 0
+	zmapTotal := 0
+	zmapAlive := 0
+	
+	// Scraped protocols
+	scrapedProto := make(map[string]int)
+	zmapProto := make(map[string]int)
+	
+	for _, proxy := range snap.Proxies {
+		// Count by protocol (all)
+		protocol := strings.ToLower(proxy.Protocol)
+		if protocol == "" {
+			protocol = "http" // default
+		}
+		
+		// Count by source
+		source := strings.ToLower(proxy.Source)
+		if source == "" {
+			source = "scraped" // default
+		}
+		
+		if proxy.Alive {
+			protocolStats[protocol]++
+			
+			if source == "zmap" {
+				zmapAlive++
+				zmapProto[protocol]++
+			} else {
+				scrapedAlive++
+				scrapedProto[protocol]++
+			}
+		}
+		
+		// Total counts
+		if source == "zmap" {
+			zmapTotal++
+		} else {
+			scrapedTotal++
+		}
+	}
+
 	response := gin.H{
 		"total_scraped": stats.TotalScraped,
 		"total_alive":   stats.TotalAlive,
@@ -336,10 +382,33 @@ func (s *Server) handleStat(c *gin.Context) {
 		"alive_percent": fmt.Sprintf("%.2f%%", stats.AlivePercent),
 		"last_check":    stats.LastCheckTime.Format(time.RFC3339),
 		"updated":       snap.Updated.Format(time.RFC3339),
+		"protocols": gin.H{
+			"http":   protocolStats["http"],
+			"socks4": protocolStats["socks4"],
+			"socks5": protocolStats["socks5"],
+		},
+		"sources": gin.H{
+			"scraped": gin.H{
+				"total": scrapedTotal,
+				"alive": scrapedAlive,
+				"protocols": scrapedProto,
+			},
+			"zmap": gin.H{
+				"total": zmapTotal,
+				"alive": zmapAlive,
+				"protocols": zmapProto,
+			},
+		},
 	}
 
-	if stats.SourceStats != nil {
-		response["sources"] = stats.SourceStats
+	// Add zmap scan statistics if available
+	if s.config.Zmap.Enabled && s.zmapScanner != nil {
+		type ZmapStatsGetter interface {
+			GetStats() interface{}
+		}
+		if zmapStats, ok := s.zmapScanner.(ZmapStatsGetter); ok {
+			response["zmap_scans"] = zmapStats.GetStats()
+		}
 	}
 
 	c.JSON(http.StatusOK, response)
@@ -402,16 +471,17 @@ func (s *Server) handleReload(c *gin.Context) {
 			if result.Alive {
 				aliveCount++
 				protocol := protocolMap[result.Proxy]
-				if protocol == "" {
-					protocol = "http" // default
-				}
-				aliveProxies = append(aliveProxies, snapshot.Proxy{
-					Address:   result.Proxy,
-					Protocol:  protocol,
-					Alive:     true,
-					LatencyMs: result.LatencyMs,
-					LastCheck: time.Now(),
-				})
+			if protocol == "" {
+				protocol = "http" // default
+			}
+			aliveProxies = append(aliveProxies, snapshot.Proxy{
+				Address:   result.Proxy,
+				Protocol:  protocol,
+				Source:    "scraped", // Reload always uses scraped sources
+				Alive:     true,
+				LatencyMs: result.LatencyMs,
+				LastCheck: time.Now(),
+			})
 			}
 		}
 
@@ -432,4 +502,3 @@ func (s *Server) handleReload(c *gin.Context) {
 		"message": "Reload triggered",
 	})
 }
-

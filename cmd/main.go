@@ -196,24 +196,23 @@ func runAggregationCycle(ctx context.Context, agg *aggregator.Aggregator, chk *c
 		zmapResults = checkProxiesInBatches(ctx, zmapProxies, chk)
 	}
 	
-	// Merge results
-	allResults := append(scrapedResults, zmapResults...)
-	
 	log.Infof("Total candidates checked: scraped=%d, zmap=%d",
 		len(scrapedResults), len(zmapResults))
 
-	// PHASE 5: Process results
+	// PHASE 5: Process results with source tracking
 
 	aliveCount := 0
 	deadCount := 0
 	aliveProxies := make([]snapshot.Proxy, 0)
 
-	for _, result := range allResults {
+	// Process scraped results
+	for _, result := range scrapedResults {
 		if result.Alive {
 			aliveCount++
 			aliveProxies = append(aliveProxies, snapshot.Proxy{
 				Address:   result.Proxy,
-				Protocol:  "http", // Determined during check
+				Protocol:  result.Protocol,
+				Source:    "scraped",
 				Alive:     true,
 				LatencyMs: result.LatencyMs,
 				LastCheck: time.Now(),
@@ -223,7 +222,24 @@ func runAggregationCycle(ctx context.Context, agg *aggregator.Aggregator, chk *c
 		}
 	}
 
-	totalChecked := len(allResults)
+	// Process zmap results
+	for _, result := range zmapResults {
+		if result.Alive {
+			aliveCount++
+			aliveProxies = append(aliveProxies, snapshot.Proxy{
+				Address:   result.Proxy,
+				Protocol:  result.Protocol,
+				Source:    "zmap",
+				Alive:     true,
+				LatencyMs: result.LatencyMs,
+				LastCheck: time.Now(),
+			})
+		} else {
+			deadCount++
+		}
+	}
+
+	totalChecked := len(scrapedResults) + len(zmapResults)
 	alivePercent := 0.0
 	if totalChecked > 0 {
 		alivePercent = float64(aliveCount) / float64(totalChecked) * 100.0
