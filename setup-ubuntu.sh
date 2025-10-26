@@ -302,7 +302,7 @@ echo -e "${YELLOW}Note:${NC} Wait 1-2 minutes for the first proxy check cycle to
 echo "Then test the API endpoints above."
 echo ""
 echo -e "For monitoring: ${BLUE}docker compose --profile monitoring up -d${NC}"
-echo -e "Then access Grafana at: ${BLUE}http://localhost:3000${NC} (admin/admin)"
+echo -e "Then access Grafana at: ${BLUE}http://localhost:8088${NC} (admin/admin)"
 echo ""
 echo -e "For more information, see:"
 echo -e "  • ${BLUE}README.md${NC} - General documentation"

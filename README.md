@@ -456,7 +456,7 @@ See [PERFORMANCE_TESTING.md](PERFORMANCE_TESTING.md) for detailed benchmarks.
 # Start with monitoring stack
 docker compose --profile monitoring up -d
 
-# Access Grafana at http://localhost:3000
+# Access Grafana at http://localhost:8088
 # Default credentials: admin / admin
 ```
 
