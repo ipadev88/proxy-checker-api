@@ -149,22 +149,36 @@ func (z *ZmapScanner) scanPortWithProtocol(ctx context.Context, port int) ([]str
 	log.Infof("Executing: %s", strings.Join(cmd.Args, " "))
 	
 	startTime := time.Now()
-	if err := cmd.Run(); err != nil {
+	err := cmd.Run()
+	duration := time.Since(startTime)
+	
+	if err != nil {
 		stderrStr := stderr.String()
-		if cmdCtx.Err() == context.DeadlineExceeded {
-			log.Warnf("Zmap scan on port %d timed out after %ds", port, z.config.MaxRuntimeSeconds)
+		
+		// Check if it's a timeout or max-runtime exit (expected behavior)
+		if cmdCtx.Err() == context.DeadlineExceeded || 
+		   strings.Contains(stderrStr, "max-runtime") ||
+		   strings.Contains(stderrStr, "maximum runtime") {
+			log.Infof("Zmap scan on port %d stopped after %v (max runtime reached)", port, duration)
+			// Continue to parse partial results
 		} else {
+			// Real error - log and return error
 			if stderrStr != "" {
 				log.Errorf("Zmap port %d stderr: %s", port, stderrStr)
 			}
+			// Still try to parse partial results before failing
+			candidates, protocol, parseErr := z.parseZmapOutputWithProtocol(outputFile, port)
+			if parseErr == nil && len(candidates) > 0 {
+				log.Warnf("Zmap had errors but found %d candidates, using them", len(candidates))
+				return candidates, protocol, nil
+			}
 			return nil, "", fmt.Errorf("zmap command failed: %w", err)
 		}
+	} else {
+		log.Infof("Port %d zmap scan completed successfully in %v", port, duration)
 	}
 
-	duration := time.Since(startTime)
-	log.Infof("Port %d zmap scan completed in %v", port, duration)
-
-	// Parse output and detect protocol
+	// Parse output and detect protocol (works for both complete and partial scans)
 	candidates, protocol, err := z.parseZmapOutputWithProtocol(outputFile, port)
 	if err != nil {
 		return nil, "", fmt.Errorf("parse zmap output: %w", err)

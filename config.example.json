@@ -58,15 +58,15 @@
     "ports": [8080, 80, 3128],
     "rate_limit": 7000,
     "bandwidth": "",
-    "max_runtime_seconds": 0,
+    "max_runtime_seconds": 600,
     "target_ranges": [],
     "blacklist": [],
     "interface": "",
     "zmap_binary": "/usr/sbin/zmap",
     "output_format": "csv",
     "zmap_extra_args": [],
-    "cooldown_seconds": 3600,
-    "comment": "Simple config: zmap -p PORT -r RATE -o OUTPUT.csv 0.0.0.0/0"
+    "cooldown_seconds": 1800,
+    "comment": "Zmap runs for 10 min (600s), finds ~4-5k IPs, repeats every 30 min (1800s). Optimized for continuous fresh proxies!"
   },
   "checker": {
     "timeout_ms": 10000,

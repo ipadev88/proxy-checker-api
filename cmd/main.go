@@ -177,10 +177,19 @@ func runAggregationCycle(ctx context.Context, agg *aggregator.Aggregator, chk *c
 	log.Info("Starting immediate check of scraped proxies...")
 	scrapedResults := checkProxiesInBatches(ctx, scrapedProxies, chk)
 	
-	// Wait for zmap to finish
-	<-zmapDone
+	// Process scraped results immediately (don't wait for zmap)
+	log.Info("Processing scraped proxy results...")
 	
-	// PHASE 4: Check zmap candidates immediately as they arrive
+	// Wait for zmap to finish (with reasonable timeout)
+	// Zmap should complete in ~10 minutes (max_runtime_seconds)
+	select {
+	case <-zmapDone:
+		log.Info("Zmap scan completed")
+	case <-time.After(15 * time.Minute):
+		log.Warn("Zmap timeout exceeded 15 minutes, processing scraped results first...")
+	}
+	
+	// PHASE 4: Check zmap candidates if available
 	var zmapResults []checker.CheckResult
 	if len(zmapProxies) > 0 {
 		log.Infof("Starting immediate check of %d zmap candidates...", len(zmapProxies))
