@@ -332,23 +332,53 @@ func checkProxiesInBatches(ctx context.Context, proxies []aggregator.ProxyWithPr
 	// Check SOCKS4 proxies in parallel
 	if len(socks4Proxies) > 0 {
 		log.Infof("Checking %d SOCKS4 proxies...", len(socks4Proxies))
+		var wg sync.WaitGroup
+		var mu sync.Mutex
+		concurrency := 1000 // Limit concurrent SOCKS checks
+		sem := make(chan struct{}, concurrency)
+		
 		for _, addr := range socks4Proxies {
-			result := chk.CheckProxyWithProtocol(ctx, addr, "socks4")
-			if idx, ok := indexMap[addr]; ok {
-				results[idx] = result
-			}
+			wg.Add(1)
+			go func(address string) {
+				defer wg.Done()
+				sem <- struct{}{}        // Acquire
+				defer func() { <-sem }() // Release
+				
+				result := chk.CheckProxyWithProtocol(ctx, address, "socks4")
+				mu.Lock()
+				if idx, ok := indexMap[address]; ok {
+					results[idx] = result
+				}
+				mu.Unlock()
+			}(addr)
 		}
+		wg.Wait()
 	}
 	
 	// Check SOCKS5 proxies in parallel
 	if len(socks5Proxies) > 0 {
 		log.Infof("Checking %d SOCKS5 proxies...", len(socks5Proxies))
+		var wg sync.WaitGroup
+		var mu sync.Mutex
+		concurrency := 1000 // Limit concurrent SOCKS checks
+		sem := make(chan struct{}, concurrency)
+		
 		for _, addr := range socks5Proxies {
-			result := chk.CheckProxyWithProtocol(ctx, addr, "socks5")
-			if idx, ok := indexMap[addr]; ok {
-				results[idx] = result
-			}
+			wg.Add(1)
+			go func(address string) {
+				defer wg.Done()
+				sem <- struct{}{}        // Acquire
+				defer func() { <-sem }() // Release
+				
+				result := chk.CheckProxyWithProtocol(ctx, address, "socks5")
+				mu.Lock()
+				if idx, ok := indexMap[address]; ok {
+					results[idx] = result
+				}
+				mu.Unlock()
+			}(addr)
 		}
+		wg.Wait()
 	}
 	
 	log.Infof("Full check complete: processed %d proxies", len(results))

@@ -189,9 +189,9 @@ func (z *ZmapScanner) buildZmapCmd(port int, outputFile string) *exec.Cmd {
 		args = append(args, "-B", z.config.Bandwidth)
 	}
 
-	// Add timeout
+	// Add max runtime if specified (note: zmap will stop after scanning all IPs anyway)
 	if z.config.MaxRuntimeSeconds > 0 {
-		args = append(args, "-T", fmt.Sprintf("%d", z.config.MaxRuntimeSeconds))
+		args = append(args, "--max-runtime", fmt.Sprintf("%d", z.config.MaxRuntimeSeconds))
 	}
 
 	// Add blacklist files (optional)
