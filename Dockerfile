@@ -20,12 +20,22 @@ RUN CGO_ENABLED=1 GOOS=linux go build -a \
 # Final stage
 FROM alpine:latest
 
-# Install runtime dependencies
-RUN apk --no-cache add ca-certificates tzdata wget
+# Install runtime dependencies including zmap
+RUN apk --no-cache add ca-certificates tzdata wget zmap libpcap-dev
 
 # Create non-root user
 RUN addgroup -g 1000 proxychecker && \
     adduser -D -u 1000 -G proxychecker proxychecker
+
+# Create blacklist directory and download blacklist
+RUN mkdir -p /etc/proxy-checker && \
+    wget -q -O /etc/proxy-checker/blacklist.txt https://raw.githubusercontent.com/zmap/zmap/master/conf/blacklist.conf || \
+    (echo "0.0.0.0/8" > /etc/proxy-checker/blacklist.txt && \
+     echo "10.0.0.0/8" >> /etc/proxy-checker/blacklist.txt && \
+     echo "127.0.0.0/8" >> /etc/proxy-checker/blacklist.txt && \
+     echo "169.254.0.0/16" >> /etc/proxy-checker/blacklist.txt && \
+     echo "172.16.0.0/12" >> /etc/proxy-checker/blacklist.txt && \
+     echo "192.168.0.0/16" >> /etc/proxy-checker/blacklist.txt)
 
 WORKDIR /app
 
@@ -36,8 +46,9 @@ COPY --from=builder /build/config.example.json ./config.json
 # Create data directory
 RUN mkdir -p /data && chown -R proxychecker:proxychecker /data /app
 
-# Switch to non-root user
-USER proxychecker
+# Note: zmap needs root/capabilities - running as root for zmap support
+# Switch to non-root user (commented out for zmap)
+# USER proxychecker
 
 # Expose API port
 EXPOSE 8083

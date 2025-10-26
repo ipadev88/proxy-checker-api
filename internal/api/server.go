@@ -107,6 +107,7 @@ func (s *Server) setupRoutes() {
 
 	// Public endpoints
 	s.router.GET("/health", s.handleHealth)
+	s.router.HEAD("/health", s.handleHealth)
 
 	// Metrics endpoint (usually scraped by Prometheus)
 	if s.config.Metrics.Enabled {

@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   proxy-checker:
     build: .
@@ -17,6 +15,9 @@ services:
       nofile:
         soft: 65535
         hard: 65535
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
     networks:
       - proxy-network
     healthcheck:

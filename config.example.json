@@ -62,7 +62,7 @@
     "target_ranges": [],
     "blacklist": ["/etc/proxy-checker/blacklist.txt"],
     "interface": "",
-    "zmap_binary": "/usr/local/bin/zmap",
+    "zmap_binary": "/usr/bin/zmap",
     "output_format": "csv",
     "zmap_extra_args": [],
     "cooldown_seconds": 3600,
