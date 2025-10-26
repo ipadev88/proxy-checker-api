@@ -70,7 +70,7 @@ func NewChecker(cfg config.CheckerConfig, metricsCollector *metrics.Collector) *
 
 // GetConfig returns the checker configuration
 func (c *Checker) GetConfig() *config.CheckerConfig {
-	return c.config
+	return &c.config
 }
 
 // CheckProxies performs high-concurrency proxy validation
