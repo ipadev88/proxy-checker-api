@@ -295,13 +295,63 @@ func checkProxiesInBatches(ctx context.Context, proxies []aggregator.ProxyWithPr
 		log.Infof("Fast filter: %d/%d passed", len(proxies), len(addresses))
 	}
 	
-	// Full check
-	log.Infof("Full checking %d proxies...", len(proxies))
-	results := make([]checker.CheckResult, len(proxies))
+	// Full check with concurrency
+	log.Infof("Full checking %d proxies with protocol awareness...", len(proxies))
+	
+	// First group by protocol for batch checking
+	httpProxies := make([]string, 0)
+	socks4Proxies := make([]string, 0)
+	socks5Proxies := make([]string, 0)
+	indexMap := make(map[string]int) // address -> original index
+	
 	for i, p := range proxies {
-		results[i] = chk.CheckProxyWithProtocol(ctx, p.Address, p.Protocol)
+		indexMap[p.Address] = i
+		switch p.Protocol {
+		case "socks4":
+			socks4Proxies = append(socks4Proxies, p.Address)
+		case "socks5":
+			socks5Proxies = append(socks5Proxies, p.Address)
+		default:
+			httpProxies = append(httpProxies, p.Address)
+		}
 	}
 	
+	results := make([]checker.CheckResult, len(proxies))
+	
+	// Check HTTP proxies in parallel
+	if len(httpProxies) > 0 {
+		log.Infof("Checking %d HTTP proxies...", len(httpProxies))
+		httpResults := chk.CheckProxies(ctx, httpProxies)
+		for _, res := range httpResults {
+			if idx, ok := indexMap[res.Proxy]; ok {
+				results[idx] = res
+			}
+		}
+	}
+	
+	// Check SOCKS4 proxies in parallel
+	if len(socks4Proxies) > 0 {
+		log.Infof("Checking %d SOCKS4 proxies...", len(socks4Proxies))
+		for _, addr := range socks4Proxies {
+			result := chk.CheckProxyWithProtocol(ctx, addr, "socks4")
+			if idx, ok := indexMap[addr]; ok {
+				results[idx] = result
+			}
+		}
+	}
+	
+	// Check SOCKS5 proxies in parallel
+	if len(socks5Proxies) > 0 {
+		log.Infof("Checking %d SOCKS5 proxies...", len(socks5Proxies))
+		for _, addr := range socks5Proxies {
+			result := chk.CheckProxyWithProtocol(ctx, addr, "socks5")
+			if idx, ok := indexMap[addr]; ok {
+				results[idx] = result
+			}
+		}
+	}
+	
+	log.Infof("Full check complete: processed %d proxies", len(results))
 	return results
 }
 

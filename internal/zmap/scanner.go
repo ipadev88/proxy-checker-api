@@ -2,6 +2,7 @@ package zmap
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"fmt"
 	"os"
@@ -133,23 +134,29 @@ func (z *ZmapScanner) scanPortWithProtocol(ctx context.Context, port int) ([]str
 	defer os.Remove(outputFile)
 
 	// Build zmap command
-	cmd := z.buildZmapCmd(port, outputFile)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	cmdArgs := z.buildZmapCmd(port, outputFile)
 
 	// Run with timeout
 	cmdCtx, cancel := context.WithTimeout(ctx, time.Duration(z.config.MaxRuntimeSeconds)*time.Second)
 	defer cancel()
 
-	cmd = exec.CommandContext(cmdCtx, cmd.Path, cmd.Args[1:]...)
+	cmd := exec.CommandContext(cmdCtx, cmdArgs.Path, cmdArgs.Args[1:]...)
+	
+	// Capture stderr for error logging
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
 
 	log.Infof("Executing: %s", strings.Join(cmd.Args, " "))
 	
 	startTime := time.Now()
 	if err := cmd.Run(); err != nil {
+		stderrStr := stderr.String()
 		if cmdCtx.Err() == context.DeadlineExceeded {
 			log.Warnf("Zmap scan on port %d timed out after %ds", port, z.config.MaxRuntimeSeconds)
 		} else {
+			if stderrStr != "" {
+				log.Errorf("Zmap port %d stderr: %s", port, stderrStr)
+			}
 			return nil, "", fmt.Errorf("zmap command failed: %w", err)
 		}
 	}
