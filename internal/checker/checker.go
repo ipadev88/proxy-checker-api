@@ -26,6 +26,7 @@ type Checker struct {
 
 type CheckResult struct {
 	Proxy     string
+	Protocol  string // "http", "socks4", "socks5"
 	Alive     bool
 	LatencyMs int64
 	Error     string
@@ -133,6 +134,7 @@ func (c *Checker) CheckProxies(ctx context.Context, proxies []string) []CheckRes
 
 				// Check with retries
 				result := c.checkProxyWithRetries(ctx, proxyAddr)
+				result.Protocol = "http" // CheckProxies always checks HTTP proxies
 
 				resultsMu.Lock()
 				results = append(results, result)
@@ -325,25 +327,30 @@ func (c *Checker) CheckSingleWithProtocol(ctx context.Context, proxyAddr string,
 			if !c.config.SocksEnabled {
 				return CheckResult{
 					Proxy:     proxyAddr,
+					Protocol:  "socks4",
 					Alive:     false,
 					LatencyMs: 0,
 					Error:     "SOCKS checking disabled",
 				}
 			}
 			result = c.CheckSOCKS4(ctx, proxyAddr, startTime)
+			result.Protocol = "socks4"
 		} else if protocol == "socks5" {
 			if !c.config.SocksEnabled {
 				return CheckResult{
 					Proxy:     proxyAddr,
+					Protocol:  "socks5",
 					Alive:     false,
 					LatencyMs: 0,
 					Error:     "SOCKS checking disabled",
 				}
 			}
 			result = c.CheckSOCKS5(ctx, proxyAddr, startTime)
+			result.Protocol = "socks5"
 		} else {
 			// Use HTTP checker
 			result = c.checkProxyWithRetries(ctx, proxyAddr)
+			result.Protocol = "http"
 		}
 
 		if result.Alive {
@@ -354,9 +361,10 @@ func (c *Checker) CheckSingleWithProtocol(ctx context.Context, proxyAddr string,
 	}
 
 	return CheckResult{
-		Proxy: proxyAddr,
-		Alive: false,
-		Error: lastError,
+		Proxy:    proxyAddr,
+		Protocol: protocol,
+		Alive:    false,
+		Error:    lastError,
 	}
 }
 
