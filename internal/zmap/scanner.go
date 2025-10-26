@@ -154,7 +154,7 @@ func (z *ZmapScanner) scanPortWithProtocol(ctx context.Context, port int) ([]str
 		if cmdCtx.Err() == context.DeadlineExceeded {
 			log.Warnf("Zmap scan on port %d timed out after %ds", port, z.config.MaxRuntimeSeconds)
 		} else {
-			return nil, fmt.Errorf("zmap command failed: %w", err)
+			return nil, "", fmt.Errorf("zmap command failed: %w", err)
 		}
 	}
 
@@ -226,7 +226,7 @@ func (z *ZmapScanner) parseZmapOutput(outputFile string, port int) ([]string, er
 func (z *ZmapScanner) parseZmapOutputWithProtocol(outputFile string, port int) ([]string, string, error) {
 	file, err := os.Open(outputFile)
 	if err != nil {
-		return nil, fmt.Errorf("open output file: %w", err)
+		return nil, "", fmt.Errorf("open output file: %w", err)
 	}
 	defer file.Close()
 

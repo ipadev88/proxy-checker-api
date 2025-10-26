@@ -6,7 +6,6 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"net/url"
 	"time"
 
 	"golang.org/x/net/proxy"
@@ -157,40 +156,6 @@ func (c *Checker) CheckSOCKS5(ctx context.Context, proxyAddr string, startTime t
 		Proxy: proxyAddr,
 		Alive: false,
 		Error: fmt.Sprintf("HTTP %d", resp.StatusCode),
-	}
-}
-
-// CheckProxyWithProtocol checks a proxy based on its protocol
-func (c *Checker) CheckProxyWithProtocol(ctx context.Context, proxyAddr string, protocol string) CheckResult {
-	startTime := time.Now()
-
-	switch protocol {
-	case "socks4":
-		if !c.config.SocksEnabled {
-			return CheckResult{
-				Proxy: proxyAddr,
-				Alive: false,
-				Error: "SOCKS checking is disabled",
-			}
-		}
-		return c.CheckSOCKS4(ctx, proxyAddr, startTime)
-
-	case "socks5":
-		if !c.config.SocksEnabled {
-			return CheckResult{
-				Proxy: proxyAddr,
-				Alive: false,
-				Error: "SOCKS checking is disabled",
-			}
-		}
-		return c.CheckSOCKS5(ctx, proxyAddr, startTime)
-
-	case "http", "https":
-		return c.checkFullHTTP(ctx, proxyAddr, startTime)
-
-	default:
-		// Try HTTP by default
-		return c.checkFullHTTP(ctx, proxyAddr, startTime)
 	}
 }
 
