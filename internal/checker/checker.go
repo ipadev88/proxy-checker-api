@@ -316,9 +316,8 @@ func (c *Checker) CheckSingleWithProtocol(ctx context.Context, proxyAddr string,
 		}
 
 		var result CheckResult
-		if protocol == "socks4" || protocol == "socks5" {
-			// Use SOCKS checker
-			if !c.cfg.SocksEnabled {
+		if protocol == "socks4" {
+			if !c.config.SocksEnabled {
 				return CheckResult{
 					Proxy:     proxyAddr,
 					Alive:     false,
@@ -326,15 +325,23 @@ func (c *Checker) CheckSingleWithProtocol(ctx context.Context, proxyAddr string,
 					Error:     "SOCKS checking disabled",
 				}
 			}
-			result = CheckSocksProxy(ctx, proxyAddr, protocol, c.cfg.SocksTestURL, c.cfg.SocksTimeoutMs)
+			result = c.CheckSOCKS4(ctx, proxyAddr, startTime)
+		} else if protocol == "socks5" {
+			if !c.config.SocksEnabled {
+				return CheckResult{
+					Proxy:     proxyAddr,
+					Alive:     false,
+					LatencyMs: 0,
+					Error:     "SOCKS checking disabled",
+				}
+			}
+			result = c.CheckSOCKS5(ctx, proxyAddr, startTime)
 		} else {
 			// Use HTTP checker
 			result = c.checkProxyWithRetries(ctx, proxyAddr)
 		}
 
 		if result.Alive {
-			latency := time.Since(startTime).Milliseconds()
-			result.LatencyMs = latency
 			return result
 		}
 
