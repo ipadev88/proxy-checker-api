@@ -7,10 +7,11 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Go Version](https://img.shields.io/badge/Go-1.21+-00ADD8?logo=go)](https://golang.org/)
 [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker)](https://www.docker.com/)
+[![Protocols](https://img.shields.io/badge/Protocols-HTTP%20%7C%20SOCKS4%20%7C%20SOCKS5-green)](https://github.com/ipadev88/proxy-checker-api)
 
-*Optimized for 10k-25k concurrent proxy checks on a 12-thread server*
+*Optimized for 10k-25k concurrent proxy checks with zmap network scanning on a 12-thread server*
 
-[Quick Start](#quick-start) • [Features](#features) • [Documentation](#documentation) • [Troubleshooting](#troubleshooting)
+[Quick Start](#quick-start) • [Features](#features) • [API Usage](#api-reference) • [Documentation](#documentation)
 
 </div>
 
@@ -19,9 +20,12 @@
 ## ✨ Features
 
 - ⚡ **High-Concurrency Checking** - 10k-25k concurrent proxy validations using Go goroutines + netpoll
+- 🎯 **Multi-Protocol Support** - HTTP, HTTPS, SOCKS4, and SOCKS5 proxies
+- 🔍 **Zmap Network Scanning** - High-speed port scanning to discover new proxies (10k-50k candidates/scan)
+- 🚀 **Fast TCP Filter** - Quick connect-only filtering before full validation
 - 🔄 **Atomic Snapshot Updates** - Zero-downtime updates with lock-free reads
 - 💾 **Multiple Storage Backends** - File, SQLite, Redis support
-- 🌐 **RESTful API** - Fast, authenticated endpoints with rate limiting
+- 🌐 **RESTful API** - Fast, authenticated endpoints with protocol filtering and rate limiting
 - 📊 **Prometheus Metrics** - Full observability and monitoring
 - 🔥 **Hot Reload** - Update configuration without restart
 - 🎯 **Adaptive Concurrency** - Automatic backpressure and resource management
@@ -47,11 +51,22 @@ sudo bash setup-ubuntu.sh
 **What the script does:**
 - ✅ Installs Docker if needed
 - ✅ Fixes docker-compose compatibility issues
-- ✅ Applies system tuning (file descriptors, TCP settings)
-- ✅ Creates configuration files
+- ✅ Installs and configures zmap with capabilities (CAP_NET_RAW, CAP_NET_ADMIN)
+- ✅ Downloads blacklist for safe network scanning
+- ✅ Applies system tuning (file descriptors, TCP settings, network parameters)
+- ✅ Creates configuration files with SOCKS4/SOCKS5 support
 - ✅ Generates secure API key
-- ✅ Starts the service
+- ✅ Starts all services (proxy-checker, Redis, Prometheus, Grafana)
 - ✅ Displays test commands
+
+**What you get out of the box:**
+- ✅ HTTP/HTTPS proxy checking
+- ✅ SOCKS4 proxy checking
+- ✅ SOCKS5 proxy checking
+- ✅ Zmap network scanning on ports: 80, 8080, 3128 (HTTP), 1080 (SOCKS5), 1081 (SOCKS4)
+- ✅ 45+ proxy sources pre-configured
+- ✅ Automatic aggregation every 60 seconds
+- ✅ Grafana dashboards for monitoring
 
 ### Docker (Manual Setup)
 
@@ -151,18 +166,29 @@ Get proxy address(es). Requires authentication.
 - `limit=N` - Return N proxies (default: 1)
 - `all=1` - Return all alive proxies
 - `format=json` - Return JSON format (default: plain text)
+- `protocol=http|socks4|socks5` - Filter by protocol (optional)
 
 **Examples:**
 
 ```bash
-# Get single proxy (plain text)
+# Get single proxy (plain text, any protocol)
 curl -H "X-Api-Key: your-key" http://localhost:8083/get-proxy
 
-# Get 10 proxies
-curl -H "X-Api-Key: your-key" "http://localhost:8083/get-proxy?limit=10"
+# Get 10 HTTP proxies
+curl -H "X-Api-Key: your-key" "http://localhost:8083/get-proxy?limit=10&protocol=http"
 
-# Get proxies in JSON format
-curl -H "X-Api-Key: your-key" "http://localhost:8083/get-proxy?format=json" | jq
+# Get all SOCKS5 proxies
+curl -H "X-Api-Key: your-key" "http://localhost:8083/get-proxy?all=1&protocol=socks5"
+
+# Get 50 SOCKS4 proxies in JSON format
+curl -H "X-Api-Key: your-key" "http://localhost:8083/get-proxy?limit=50&protocol=socks4&format=json" | jq
+```
+
+**Plain Text Response:**
+```
+1.2.3.4:8080
+5.6.7.8:1080
+9.10.11.12:3128
 ```
 
 **JSON Response:**
@@ -173,9 +199,17 @@ curl -H "X-Api-Key: your-key" "http://localhost:8083/get-proxy?format=json" | jq
   "proxies": [
     {
       "address": "1.2.3.4:8080",
+      "protocol": "http",
       "alive": true,
       "latency_ms": 234,
-      "last_check": "2025-10-25T12:34:56Z"
+      "last_check": "2025-10-26T12:34:56Z"
+    },
+    {
+      "address": "5.6.7.8:1080",
+      "protocol": "socks5",
+      "alive": true,
+      "latency_ms": 456,
+      "last_check": "2025-10-26T12:34:56Z"
     }
   ]
 }
@@ -242,7 +276,31 @@ curl http://localhost:8083/metrics
 - `proxychecker_checks_total` - Total checks performed
 - `proxychecker_check_duration_seconds` - Check latency histogram
 - `proxychecker_api_requests_total` - API request counter
+- `proxychecker_zmap_scans_total` - Zmap scans performed
+- `proxychecker_zmap_candidates_found` - Candidates discovered by zmap
 - `go_goroutines` - Active goroutines
+
+---
+
+#### `GET /stats/zmap`
+
+Get zmap scanner statistics. Requires authentication.
+
+```bash
+curl -H "X-Api-Key: your-key" http://localhost:8083/stats/zmap | jq
+```
+
+**Response:**
+```json
+{
+  "enabled": true,
+  "ports": [8080, 80, 3128, 1080, 1081],
+  "last_scan_time": "2025-10-26T12:00:00Z",
+  "last_scan_duration": 1834.5,
+  "candidates_found": 15234,
+  "total_scans": 24
+}
+```
 
 ---
 
@@ -258,15 +316,30 @@ curl http://localhost:8083/metrics
       {
         "url": "https://raw.githubusercontent.com/TheSpeedX/PROXY-List/master/http.txt",
         "type": "txt",
+        "protocol": "http",
+        "enabled": true
+      },
+      {
+        "url": "https://api.proxyscrape.com/v2/?request=get&protocol=socks5",
+        "type": "txt",
+        "protocol": "socks5",
         "enabled": true
       }
     ]
   },
+  "zmap": {
+    "enabled": true,
+    "ports": [8080, 80, 3128, 1080, 1081],
+    "rate_limit": 10000,
+    "bandwidth": "10M"
+  },
   "checker": {
     "timeout_ms": 15000,
     "concurrency_total": 20000,
-    "test_url": "https://www.google.com/generate_204",
-    "mode": "full-http"
+    "test_url": "http://www.gstatic.com/generate_204",
+    "mode": "full-http",
+    "socks_enabled": true,
+    "socks_timeout_ms": 15000
   },
   "api": {
     "addr": ":8083",
@@ -663,22 +736,25 @@ See [TESTS.md](TESTS.md) for complete testing documentation.
 
 ## 📚 Documentation
 
-### Quick Reference
-- **[START_HERE.txt](START_HERE.txt)** - Quick start guide (plain text)
-- **[QUICKREF.md](QUICKREF.md)** - Command reference card
+### 🚀 Quick Setup
+- **[DEPLOYMENT_READY.md](DEPLOYMENT_READY.md)** - **START HERE!** Complete setup and deployment guide
+- **[setup-ubuntu.sh](setup-ubuntu.sh)** - Automated one-command setup script
 
-### Setup & Deployment
-- **[DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md)** - Complete deployment walkthrough
-- **[DEPLOY_NOW.md](DEPLOY_NOW.md)** - Quick deployment guide with all fixes
-- **[setup-ubuntu.sh](setup-ubuntu.sh)** - Automated setup script
+### 🎯 Protocol Support
+- **[SOCKS_INTEGRATION_COMPLETE.md](SOCKS_INTEGRATION_COMPLETE.md)** - SOCKS4/SOCKS5 implementation details
+- **[SOCKS_SETUP_GUIDE.md](SOCKS_SETUP_GUIDE.md)** - SOCKS configuration guide
 
-### Troubleshooting & Operations
-- **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** - Complete troubleshooting guide
-- **[OPS_CHECKLIST.md](OPS_CHECKLIST.md)** - Production operations guide
+### 🔍 Network Scanning
+- **[ZMAP_INTEGRATION_SUMMARY.md](ZMAP_INTEGRATION_SUMMARY.md)** - Zmap integration overview
+- **[ZMAP_QUICKSTART.md](ZMAP_QUICKSTART.md)** - Quick zmap setup guide
 
-### Technical Documentation
-- **[ARCHITECTURE.md](ARCHITECTURE.md)** - System architecture details
+### 🛠️ Operations & Troubleshooting
+- **[OPS_CHECKLIST.md](OPS_CHECKLIST.md)** - Production operations checklist
 - **[PERFORMANCE_TESTING.md](PERFORMANCE_TESTING.md)** - Performance benchmarks
+
+### 🏗️ Technical Details
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** - System architecture details
+- **[IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md)** - Implementation overview
 - **[TESTS.md](TESTS.md)** - Testing documentation
 
 ---
@@ -726,15 +802,25 @@ Built with excellent open-source tools:
 
 ## 📈 Version
 
-**Current Version:** 1.0.0
+**Current Version:** 2.0.0
 
-**What's New in v1.0.0:**
-- ✅ Fixed docker-compose compatibility issues
-- ✅ Standardized ports (now consistent on 8083)
-- ✅ Added automated setup script
-- ✅ Comprehensive documentation
-- ✅ Enhanced troubleshooting guides
-- ✅ Fixed all build errors (circular imports, type mismatches)
+**What's New in v2.0.0:**
+- ✅ **SOCKS4 & SOCKS5 Support** - Full implementation with protocol detection
+- ✅ **Zmap Network Scanning** - High-speed port scanning (10k-50k candidates/scan)
+- ✅ **Fast TCP Filter** - Quick connect-only filtering for better performance
+- ✅ **Protocol-Aware API** - Filter proxies by protocol (`?protocol=http|socks4|socks5`)
+- ✅ **Port-to-Protocol Mapping** - Automatic protocol detection from zmap scans
+- ✅ **Enhanced Aggregation** - Protocol detection from URLs and proxy lists
+- ✅ **Automated Setup** - One-command deployment with zmap configuration
+- ✅ **SOCKS Sources** - Pre-configured SOCKS4/SOCKS5 proxy sources
+- ✅ **Comprehensive Documentation** - Complete guides for all features
+
+**Previous Releases:**
+- **v1.0.0** - Initial production release with HTTP support
+  - Fixed docker-compose compatibility issues
+  - Standardized ports on 8083
+  - Added automated setup script
+  - Fixed all build errors
 
 ---
 

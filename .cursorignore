@@ -1,0 +1,28 @@
+# Documentation files (too verbose for context)
+*.md
+!README.md
+
+# Large config/data files
+grafana-dashboard.json
+prometheus.yml
+alerts.yml
+
+# Temporary files
+*.tmp
+*.log
+*.csv
+/tmp/
+
+# Build artifacts
+proxy-checker
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test binary
+*.test
+
+# Output
+*.out
+

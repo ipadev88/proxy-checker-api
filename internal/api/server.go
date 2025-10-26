@@ -27,6 +27,7 @@ type Server struct {
 	metrics     *metrics.Collector
 	aggregator  *aggregator.Aggregator
 	checker     *checker.Checker
+	zmapScanner interface{} // interface{} to avoid import cycle, actual type is *zmap.ZmapScanner
 	router      *gin.Engine
 	httpServer  *http.Server
 	rateLimiter *RateLimiter
@@ -72,7 +73,7 @@ func (rl *RateLimiter) GetLimiter(key string) *rate.Limiter {
 }
 
 func NewServer(cfg *config.Config, snap *snapshot.Manager, metricsCollector *metrics.Collector,
-	agg *aggregator.Aggregator, chk *checker.Checker) *Server {
+	agg *aggregator.Aggregator, chk *checker.Checker, zmapScanner interface{}) *Server {
 
 	if cfg.Logging.Level == "debug" {
 		gin.SetMode(gin.DebugMode)
@@ -87,6 +88,7 @@ func NewServer(cfg *config.Config, snap *snapshot.Manager, metricsCollector *met
 		config:      cfg,
 		snapshot:    snap,
 		metrics:     metricsCollector,
+		zmapScanner: zmapScanner,
 		aggregator:  agg,
 		checker:     chk,
 		router:      router,
@@ -122,6 +124,7 @@ func (s *Server) setupRoutes() {
 
 	protected.GET("/get-proxy", s.handleGetProxy)
 	protected.GET("/stat", s.handleStat)
+	protected.GET("/stats/zmap", s.handleZmapStats)
 	protected.POST("/reload", s.handleReload)
 }
 
@@ -248,6 +251,7 @@ func (s *Server) handleGetProxy(c *gin.Context) {
 	all := c.Query("all") == "1"
 	limitStr := c.Query("limit")
 	format := c.Query("format")
+	protocol := c.Query("protocol") // Filter by protocol: http, socks4, socks5
 	acceptHeader := c.GetHeader("Accept")
 
 	wantsJSON := format == "json" || strings.Contains(acceptHeader, "application/json")
@@ -275,6 +279,32 @@ func (s *Server) handleGetProxy(c *gin.Context) {
 			return
 		}
 		proxies = []snapshot.Proxy{proxy}
+	}
+
+	// Filter by protocol if specified
+	if protocol != "" {
+		protocol = strings.ToLower(protocol)
+		if protocol != "http" && protocol != "socks4" && protocol != "socks5" {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "Invalid protocol. Must be one of: http, socks4, socks5",
+			})
+			return
+		}
+
+		var filtered []snapshot.Proxy
+		for _, p := range proxies {
+			if strings.ToLower(p.Protocol) == protocol {
+				filtered = append(filtered, p)
+			}
+		}
+		proxies = filtered
+
+		if len(proxies) == 0 {
+			c.JSON(http.StatusServiceUnavailable, gin.H{
+				"error": fmt.Sprintf("No %s proxies available", protocol),
+			})
+			return
+		}
 	}
 
 	if wantsJSON {
@@ -312,6 +342,32 @@ func (s *Server) handleStat(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, response)
+}
+
+func (s *Server) handleZmapStats(c *gin.Context) {
+	// Check if zmap is enabled
+	if !s.config.Zmap.Enabled || s.zmapScanner == nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": "zmap scanning is not enabled",
+		})
+		return
+	}
+
+	// Type assert to get stats interface
+	type ZmapStatsGetter interface {
+		GetStats() map[string]interface{}
+	}
+
+	scanner, ok := s.zmapScanner.(ZmapStatsGetter)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "unable to get zmap stats",
+		})
+		return
+	}
+
+	stats := scanner.GetStats()
+	c.JSON(http.StatusOK, stats)
 }
 
 func (s *Server) handleReload(c *gin.Context) {
