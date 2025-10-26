@@ -110,6 +110,14 @@ func VerifyZmapSetup(cfg config.ZmapConfig) error {
 		return fmt.Errorf("no ports configured for scanning")
 	}
 
+	// Warn if no target ranges (will scan entire internet)
+	if len(cfg.TargetRanges) == 0 {
+		log.Warn("⚠️  WARNING: No target_ranges configured!")
+		log.Warn("⚠️  Zmap will scan ENTIRE INTERNET")
+		log.Warn("⚠️  This may be ILLEGAL in your country without authorization")
+		log.Warn("⚠️  Use at your own risk!")
+	}
+
 	for _, port := range cfg.Ports {
 		if port < 1 || port > 65535 {
 			return fmt.Errorf("invalid port number: %d (must be 1-65535)", port)

@@ -68,6 +68,11 @@ func NewChecker(cfg config.CheckerConfig, metricsCollector *metrics.Collector) *
 	}
 }
 
+// GetConfig returns the checker configuration
+func (c *Checker) GetConfig() *config.CheckerConfig {
+	return c.config
+}
+
 // CheckProxies performs high-concurrency proxy validation
 func (c *Checker) CheckProxies(ctx context.Context, proxies []string) []CheckResult {
 	totalProxies := len(proxies)

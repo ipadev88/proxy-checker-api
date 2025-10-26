@@ -61,33 +61,43 @@ func (z *ZmapScanner) ScanWithProtocol(ctx context.Context) ([]aggregator.ProxyW
 
 	allCandidates := make([]aggregator.ProxyWithProtocol, 0)
 	var mu sync.Mutex
+	var wg sync.WaitGroup
 
-	// Scan each port sequentially to avoid overwhelming the network
+	// Scan all ports in PARALLEL for speed
+	log.Info("Scanning all ports in parallel...")
 	for _, port := range z.config.Ports {
-		candidates, protocol, err := z.scanPortWithProtocol(ctx, port)
-		if err != nil {
-			log.Errorf("Failed to scan port %d: %v", port, err)
-			if z.metrics != nil {
-				z.metrics.RecordZmapScan(port, "error")
+		wg.Add(1)
+		go func(p int) {
+			defer wg.Done()
+			
+			candidates, protocol, err := z.scanPortWithProtocol(ctx, p)
+			if err != nil {
+				log.Errorf("Failed to scan port %d: %v", p, err)
+				if z.metrics != nil {
+					z.metrics.RecordZmapScan(p, "error")
+				}
+				return
 			}
-			continue
-		}
 
-		mu.Lock()
-		for _, addr := range candidates {
-			allCandidates = append(allCandidates, aggregator.ProxyWithProtocol{
-				Address:  addr,
-				Protocol: protocol,
-			})
-		}
-		mu.Unlock()
+			mu.Lock()
+			for _, addr := range candidates {
+				allCandidates = append(allCandidates, aggregator.ProxyWithProtocol{
+					Address:  addr,
+					Protocol: protocol,
+				})
+			}
+			mu.Unlock()
 
-		log.Infof("Port %d scan complete: %d candidates found (protocol: %s)", port, len(candidates), protocol)
-		if z.metrics != nil {
-			z.metrics.RecordZmapScan(port, "success")
-			z.metrics.RecordZmapCandidates(port, len(candidates))
-		}
+			log.Infof("Port %d scan complete: %d candidates found (protocol: %s)", p, len(candidates), protocol)
+			if z.metrics != nil {
+				z.metrics.RecordZmapScan(p, "success")
+				z.metrics.RecordZmapCandidates(p, len(candidates))
+			}
+		}(port)
 	}
+
+	// Wait for all parallel scans to complete
+	wg.Wait()
 
 	// Deduplicate (based on address+protocol)
 	uniqueCandidates := deduplicateProxiesWithProtocol(allCandidates)
@@ -194,9 +204,14 @@ func (z *ZmapScanner) buildZmapCmd(port int, outputFile string) *exec.Cmd {
 	// Add extra args
 	args = append(args, z.config.ZmapExtraArgs...)
 
-	// Add target ranges (if empty, scans all)
+	// Add target ranges (if empty, scans entire internet)
+	// WARNING: Scanning without targets is legally risky!
 	if len(z.config.TargetRanges) > 0 {
 		args = append(args, z.config.TargetRanges...)
+	} else {
+		log.Warn("⚠️  No target ranges specified - zmap will scan ENTIRE INTERNET")
+		log.Warn("⚠️  This may be ILLEGAL without authorization")
+		log.Warn("⚠️  This may take hours and use significant bandwidth")
 	}
 
 	return exec.Command(args[0], args[1:]...)

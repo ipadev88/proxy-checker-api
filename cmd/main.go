@@ -152,100 +152,58 @@ func runAggregationCycle(ctx context.Context, agg *aggregator.Aggregator, chk *c
 	totalScraped := len(scrapedProxies)
 	log.Infof("Aggregated %d unique proxies from %d sources", totalScraped, len(sourceStats))
 
-	// PHASE 2: Run zmap scan (if enabled)
+	// PHASE 2: Run zmap scan in parallel with checking
 	var zmapProxies []aggregator.ProxyWithProtocol
+	zmapDone := make(chan bool)
+	
 	if zmapScanner != nil {
-		log.Info("Running zmap scan...")
-		zmapProxies, err = zmapScanner.ScanWithProtocol(ctx)
-		if err != nil {
-			log.Errorf("Zmap scan failed: %v", err)
-		} else {
-			log.Infof("Zmap scan found %d candidates", len(zmapProxies))
-		}
-	}
-
-	// PHASE 3: Merge and deduplicate
-	allProxies := append(scrapedProxies, zmapProxies...)
-	proxies := deduplicateProxiesWithProtocol(allProxies)
-	
-	log.Infof("Total unique proxies after merge: %d (scraped=%d, zmap=%d)",
-		len(proxies), len(scrapedProxies), len(zmapProxies))
-
-	if len(proxies) == 0 {
-		log.Warn("No proxies to check, skipping check cycle")
-		return
-	}
-
-	// PHASE 4: Fast TCP filter (if enabled)
-	if checkerCfg.EnableFastFilter && len(proxies) > 1000 {
-		log.Info("Running fast TCP filter...")
-		filterStart := time.Now()
-		
-		// Extract addresses for fast filter
-		addresses := make([]string, len(proxies))
-		for i, p := range proxies {
-			addresses[i] = p.Address
-		}
-		
-		// Filter
-		filteredAddresses := checker.FastConnectFilter(ctx, addresses, checkerCfg.FastFilterTimeoutMs, checkerCfg.FastFilterConcurrency)
-		filterDuration := time.Since(filterStart)
-		
-		// Create map of filtered addresses
-		filteredMap := make(map[string]bool)
-		for _, addr := range filteredAddresses {
-			filteredMap[addr] = true
-		}
-		
-		// Keep only proxies that passed filter
-		var filteredProxies []aggregator.ProxyWithProtocol
-		for _, p := range proxies {
-			if filteredMap[p.Address] {
-				filteredProxies = append(filteredProxies, p)
+		log.Info("Running zmap scan in parallel...")
+		go func() {
+			var err error
+			zmapProxies, err = zmapScanner.ScanWithProtocol(ctx)
+			if err != nil {
+				log.Errorf("Zmap scan failed: %v", err)
+			} else {
+				log.Infof("Zmap scan found %d candidates", len(zmapProxies))
 			}
-		}
-		proxies = filteredProxies
-		
-		log.Infof("Fast filter complete: %d connectable proxies in %v", len(proxies), filterDuration)
-		
-		if len(proxies) == 0 {
-			log.Warn("No proxies passed fast filter, skipping full check")
-			return
-		}
+			zmapDone <- true
+		}()
+	} else {
+		zmapDone <- true // Skip if zmap disabled
 	}
 
-	// PHASE 5: Full check with protocol awareness
-	checkStart := time.Now()
-	var results []checker.CheckResult
+	// PHASE 3: Start checking scraped proxies immediately
+	log.Info("Starting immediate check of scraped proxies...")
+	scrapedResults := checkProxiesInBatches(ctx, scrapedProxies, chk)
 	
-	// Check proxies with their respective protocols
-	for _, proxyWithProto := range proxies {
-		result := chk.CheckProxyWithProtocol(ctx, proxyWithProto.Address, proxyWithProto.Protocol)
-		results = append(results, result)
+	// Wait for zmap to finish
+	<-zmapDone
+	
+	// PHASE 4: Check zmap candidates immediately as they arrive
+	var zmapResults []checker.CheckResult
+	if len(zmapProxies) > 0 {
+		log.Infof("Starting immediate check of %d zmap candidates...", len(zmapProxies))
+		zmapResults = checkProxiesInBatches(ctx, zmapProxies, chk)
 	}
 	
-	checkDuration := time.Since(checkStart)
+	// Merge results
+	allResults := append(scrapedResults, zmapResults...)
+	
+	log.Infof("Total candidates checked: scraped=%d, zmap=%d",
+		len(scrapedResults), len(zmapResults))
+
+	// PHASE 5: Process results
 
 	aliveCount := 0
 	deadCount := 0
-	aliveProxies := make([]snapshot.Proxy, 0, len(results))
+	aliveProxies := make([]snapshot.Proxy, 0)
 
-	// Create protocol map for lookup
-	protocolMap := make(map[string]string)
-	for _, p := range proxies {
-		protocolMap[p.Address] = p.Protocol
-	}
-
-	for _, result := range results {
+	for _, result := range allResults {
 		if result.Alive {
 			aliveCount++
-			protocol := protocolMap[result.Proxy]
-			if protocol == "" {
-				protocol = "http" // default
-			}
 			aliveProxies = append(aliveProxies, snapshot.Proxy{
 				Address:   result.Proxy,
-				Protocol:  protocol,
+				Protocol:  "http", // Determined during check
 				Alive:     true,
 				LatencyMs: result.LatencyMs,
 				LastCheck: time.Now(),
@@ -255,13 +213,14 @@ func runAggregationCycle(ctx context.Context, agg *aggregator.Aggregator, chk *c
 		}
 	}
 
+	totalChecked := len(allResults)
 	alivePercent := 0.0
-	if totalScraped > 0 {
-		alivePercent = float64(aliveCount) / float64(totalScraped) * 100.0
+	if totalChecked > 0 {
+		alivePercent = float64(aliveCount) / float64(totalChecked) * 100.0
 	}
 
-	log.Infof("Check complete: %d alive, %d dead (%.2f%% alive) in %v",
-		aliveCount, deadCount, alivePercent, checkDuration)
+	log.Infof("Check complete: %d alive, %d dead (%.2f%% alive)",
+		aliveCount, deadCount, alivePercent)
 
 	// Update snapshot
 	stats := snapshot.Stats{
@@ -300,5 +259,49 @@ func deduplicateProxiesWithProtocol(proxies []aggregator.ProxyWithProtocol) []ag
 	}
 
 	return unique
+}
+
+// checkProxiesInBatches checks proxies with fast filter and full check
+func checkProxiesInBatches(ctx context.Context, proxies []aggregator.ProxyWithProtocol, chk *checker.Checker) []checker.CheckResult {
+	if len(proxies) == 0 {
+		return []checker.CheckResult{}
+	}
+	
+	cfg := chk.GetConfig()
+	
+	// Fast filter if enabled
+	addresses := make([]string, len(proxies))
+	for i, p := range proxies {
+		addresses[i] = p.Address
+	}
+	
+	if cfg.EnableFastFilter && len(addresses) > 1000 {
+		log.Infof("Fast filtering %d proxies...", len(addresses))
+		filtered := checker.FastConnectFilter(ctx, addresses, cfg.FastFilterTimeoutMs, cfg.FastFilterConcurrency)
+		
+		// Keep only filtered
+		filteredMap := make(map[string]bool)
+		for _, addr := range filtered {
+			filteredMap[addr] = true
+		}
+		
+		var filteredProxies []aggregator.ProxyWithProtocol
+		for _, p := range proxies {
+			if filteredMap[p.Address] {
+				filteredProxies = append(filteredProxies, p)
+			}
+		}
+		proxies = filteredProxies
+		log.Infof("Fast filter: %d/%d passed", len(proxies), len(addresses))
+	}
+	
+	// Full check
+	log.Infof("Full checking %d proxies...", len(proxies))
+	results := make([]checker.CheckResult, len(proxies))
+	for i, p := range proxies {
+		results[i] = chk.CheckProxyWithProtocol(ctx, p.Address, p.Protocol)
+	}
+	
+	return results
 }
 

@@ -55,18 +55,18 @@
   },
   "zmap": {
     "enabled": true,
-    "ports": [8080, 80, 3128, 1080, 1081],
-    "rate_limit": 10000,
+    "ports": [8080, 80, 3128],
+    "rate_limit": 7000,
     "bandwidth": "10M",
     "max_runtime_seconds": 3600,
     "target_ranges": [],
     "blacklist": ["/etc/proxy-checker/blacklist.txt"],
     "interface": "",
-    "zmap_binary": "/usr/bin/zmap",
+    "zmap_binary": "/usr/sbin/zmap",
     "output_format": "csv",
     "zmap_extra_args": [],
     "cooldown_seconds": 3600,
-    "comment": "Ports 8080,80,3128=HTTP proxies; 1080=SOCKS5; 1081=SOCKS4"
+    "comment": "⚠️ EMPTY target_ranges = SCAN ENTIRE INTERNET (may be illegal!). Add specific ranges like ['10.0.0.0/8'] to scan only your networks."
   },
   "checker": {
     "timeout_ms": 10000,
