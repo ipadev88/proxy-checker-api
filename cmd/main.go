@@ -15,6 +15,7 @@ import (
 	"github.com/proxy-checker-api/internal/metrics"
 	"github.com/proxy-checker-api/internal/snapshot"
 	"github.com/proxy-checker-api/internal/storage"
+	"github.com/proxy-checker-api/internal/zmap"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -65,15 +66,33 @@ func main() {
 	// Initialize checker
 	chk := checker.NewChecker(cfg.Checker, metricsCollector)
 
+	// Initialize zmap scanner (if enabled)
+	var zmapScanner *zmap.ZmapScanner
+	if cfg.Zmap.Enabled {
+		log.Info("Zmap scanning is enabled")
+		
+		// Verify zmap setup
+		if err := zmap.VerifyZmapSetup(cfg.Zmap); err != nil {
+			log.Warnf("Zmap setup verification failed: %v", err)
+			log.Warn("Zmap scanning will be disabled")
+			cfg.Zmap.Enabled = false
+		} else {
+			zmapScanner = zmap.NewZmapScanner(cfg.Zmap, metricsCollector)
+			log.Infof("Zmap scanner initialized for ports: %v", cfg.Zmap.Ports)
+		}
+	} else {
+		log.Info("Zmap scanning is disabled")
+	}
+
 	// Context for graceful shutdown
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	// Start aggregation loop
-	go runAggregationLoop(ctx, agg, chk, snapshotMgr, cfg.Aggregator.IntervalSeconds)
+	go runAggregationLoop(ctx, agg, chk, snapshotMgr, zmapScanner, &cfg.Checker, cfg.Aggregator.IntervalSeconds)
 
 	// Start API server
-	apiServer := api.NewServer(cfg, snapshotMgr, metricsCollector, agg, chk)
+	apiServer := api.NewServer(cfg, snapshotMgr, metricsCollector, agg, chk, zmapScanner)
 	go func() {
 		if err := apiServer.Start(); err != nil {
 			log.Fatalf("API server failed: %v", err)
@@ -101,9 +120,9 @@ func main() {
 	log.Info("Shutdown complete")
 }
 
-func runAggregationLoop(ctx context.Context, agg *aggregator.Aggregator, chk *checker.Checker, snap *snapshot.Manager, intervalSeconds int) {
+func runAggregationLoop(ctx context.Context, agg *aggregator.Aggregator, chk *checker.Checker, snap *snapshot.Manager, zmapScanner *zmap.ZmapScanner, checkerCfg *config.CheckerConfig, intervalSeconds int) {
 	// Run immediately on startup
-	runAggregationCycle(ctx, agg, chk, snap)
+	runAggregationCycle(ctx, agg, chk, snap, zmapScanner, checkerCfg)
 
 	ticker := time.NewTicker(time.Duration(intervalSeconds) * time.Second)
 	defer ticker.Stop()
@@ -114,44 +133,119 @@ func runAggregationLoop(ctx context.Context, agg *aggregator.Aggregator, chk *ch
 			log.Info("Aggregation loop stopped")
 			return
 		case <-ticker.C:
-			runAggregationCycle(ctx, agg, chk, snap)
+			runAggregationCycle(ctx, agg, chk, snap, zmapScanner, checkerCfg)
 		}
 	}
 }
 
-func runAggregationCycle(ctx context.Context, agg *aggregator.Aggregator, chk *checker.Checker, snap *snapshot.Manager) {
+func runAggregationCycle(ctx context.Context, agg *aggregator.Aggregator, chk *checker.Checker, snap *snapshot.Manager, zmapScanner *zmap.ZmapScanner, checkerCfg *config.CheckerConfig) {
 	start := time.Now()
 	log.Info("Starting aggregation cycle")
 
-	// Fetch proxies from sources
-	proxies, sourceStats, err := agg.Aggregate(ctx)
+	// PHASE 1: Fetch proxies from HTTP sources
+	scrapedProxies, sourceStats, err := agg.Aggregate(ctx)
 	if err != nil {
 		log.Errorf("Aggregation failed: %v", err)
 		return
 	}
 
-	totalScraped := len(proxies)
+	totalScraped := len(scrapedProxies)
 	log.Infof("Aggregated %d unique proxies from %d sources", totalScraped, len(sourceStats))
 
-	if totalScraped == 0 {
-		log.Warn("No proxies aggregated, skipping check cycle")
+	// PHASE 2: Run zmap scan (if enabled)
+	var zmapProxies []aggregator.ProxyWithProtocol
+	if zmapScanner != nil {
+		log.Info("Running zmap scan...")
+		zmapProxies, err = zmapScanner.ScanWithProtocol(ctx)
+		if err != nil {
+			log.Errorf("Zmap scan failed: %v", err)
+		} else {
+			log.Infof("Zmap scan found %d candidates", len(zmapProxies))
+		}
+	}
+
+	// PHASE 3: Merge and deduplicate
+	allProxies := append(scrapedProxies, zmapProxies...)
+	proxies := deduplicateProxiesWithProtocol(allProxies)
+	
+	log.Infof("Total unique proxies after merge: %d (scraped=%d, zmap=%d)",
+		len(proxies), len(scrapedProxies), len(zmapProxies))
+
+	if len(proxies) == 0 {
+		log.Warn("No proxies to check, skipping check cycle")
 		return
 	}
 
-	// Check proxies
+	// PHASE 4: Fast TCP filter (if enabled)
+	if checkerCfg.EnableFastFilter && len(proxies) > 1000 {
+		log.Info("Running fast TCP filter...")
+		filterStart := time.Now()
+		
+		// Extract addresses for fast filter
+		addresses := make([]string, len(proxies))
+		for i, p := range proxies {
+			addresses[i] = p.Address
+		}
+		
+		// Filter
+		filteredAddresses := checker.FastConnectFilter(ctx, addresses, checkerCfg.FastFilterTimeoutMs, checkerCfg.FastFilterConcurrency)
+		filterDuration := time.Since(filterStart)
+		
+		// Create map of filtered addresses
+		filteredMap := make(map[string]bool)
+		for _, addr := range filteredAddresses {
+			filteredMap[addr] = true
+		}
+		
+		// Keep only proxies that passed filter
+		var filteredProxies []aggregator.ProxyWithProtocol
+		for _, p := range proxies {
+			if filteredMap[p.Address] {
+				filteredProxies = append(filteredProxies, p)
+			}
+		}
+		proxies = filteredProxies
+		
+		log.Infof("Fast filter complete: %d connectable proxies in %v", len(proxies), filterDuration)
+		
+		if len(proxies) == 0 {
+			log.Warn("No proxies passed fast filter, skipping full check")
+			return
+		}
+	}
+
+	// PHASE 5: Full check with protocol awareness
 	checkStart := time.Now()
-	results := chk.CheckProxies(ctx, proxies)
+	var results []checker.CheckResult
+	
+	// Check proxies with their respective protocols
+	for _, proxyWithProto := range proxies {
+		result := chk.CheckProxyWithProtocol(ctx, proxyWithProto.Address, proxyWithProto.Protocol)
+		results = append(results, result)
+	}
+	
 	checkDuration := time.Since(checkStart)
 
 	aliveCount := 0
 	deadCount := 0
 	aliveProxies := make([]snapshot.Proxy, 0, len(results))
 
+	// Create protocol map for lookup
+	protocolMap := make(map[string]string)
+	for _, p := range proxies {
+		protocolMap[p.Address] = p.Protocol
+	}
+
 	for _, result := range results {
 		if result.Alive {
 			aliveCount++
+			protocol := protocolMap[result.Proxy]
+			if protocol == "" {
+				protocol = "http" // default
+			}
 			aliveProxies = append(aliveProxies, snapshot.Proxy{
 				Address:   result.Proxy,
+				Protocol:  protocol,
 				Alive:     true,
 				LatencyMs: result.LatencyMs,
 				LastCheck: time.Now(),
@@ -189,5 +283,22 @@ func runAggregationCycle(ctx context.Context, agg *aggregator.Aggregator, chk *c
 	runtime.ReadMemStats(&m)
 	log.Infof("Memory: Alloc=%dMB, TotalAlloc=%dMB, Sys=%dMB, NumGC=%d, Goroutines=%d",
 		m.Alloc/1024/1024, m.TotalAlloc/1024/1024, m.Sys/1024/1024, m.NumGC, runtime.NumGoroutine())
+}
+
+// deduplicateProxiesWithProtocol removes duplicate proxy addresses with protocol awareness
+func deduplicateProxiesWithProtocol(proxies []aggregator.ProxyWithProtocol) []aggregator.ProxyWithProtocol {
+	seen := make(map[string]struct{}, len(proxies))
+	unique := make([]aggregator.ProxyWithProtocol, 0, len(proxies))
+
+	for _, proxy := range proxies {
+		// Key by address + protocol
+		key := proxy.Address + "|" + proxy.Protocol
+		if _, exists := seen[key]; !exists {
+			seen[key] = struct{}{}
+			unique = append(unique, proxy)
+		}
+	}
+
+	return unique
 }
 

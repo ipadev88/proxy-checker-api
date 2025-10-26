@@ -5,6 +5,7 @@ import "time"
 // Proxy represents a single proxy server
 type Proxy struct {
 	Address   string    `json:"address"`
+	Protocol  string    `json:"protocol"`  // "http", "socks4", "socks5"
 	Alive     bool      `json:"alive"`
 	LatencyMs int64     `json:"latency_ms"`
 	LastCheck time.Time `json:"last_check"`

@@ -3,6 +3,10 @@ module github.com/proxy-checker-api
 go 1.21
 
 require (
+	golang.org/x/net v0.17.0
+)
+
+require (
 	github.com/gin-gonic/gin v1.10.0
 	github.com/prometheus/client_golang v1.19.0
 	github.com/sirupsen/logrus v1.9.3

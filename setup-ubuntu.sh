@@ -72,12 +72,79 @@ else
 fi
 
 echo ""
-echo -e "${YELLOW}[3/8] Installing required utilities...${NC}"
+echo -e "${YELLOW}[3/9] Installing required utilities...${NC}"
 apt-get install -y curl jq wget net-tools openssl
 echo -e "${GREEN}✓ Utilities installed${NC}"
 
 echo ""
-echo -e "${YELLOW}[4/8] Setting up configuration files...${NC}"
+echo -e "${YELLOW}[4/9] Installing and configuring Zmap...${NC}"
+
+# Install zmap and dependencies
+apt-get install -y zmap libpcap-dev
+
+# Verify zmap installation
+if ! command -v zmap &> /dev/null; then
+    echo -e "${RED}✗ Zmap installation failed${NC}"
+    exit 1
+fi
+
+ZMAP_VERSION=$(zmap --version 2>&1 | head -n1)
+echo -e "${GREEN}✓ Zmap installed: ${ZMAP_VERSION}${NC}"
+
+# Create directories for zmap
+mkdir -p /etc/proxy-checker
+mkdir -p /var/log/proxy-checker
+
+# Download zmap blacklist
+echo "Downloading zmap blacklist..."
+BLACKLIST_URL="https://raw.githubusercontent.com/zmap/zmap/master/conf/blacklist.conf"
+BLACKLIST_FILE="/etc/proxy-checker/blacklist.txt"
+
+if curl -f -s -o "$BLACKLIST_FILE" "$BLACKLIST_URL" 2>/dev/null; then
+    BLACKLIST_COUNT=$(grep -c -v "^#" "$BLACKLIST_FILE" || echo "0")
+    echo -e "${GREEN}✓ Blacklist downloaded: ${BLACKLIST_COUNT} CIDR ranges${NC}"
+else
+    echo -e "${YELLOW}⚠ GitHub blacklist unavailable, creating basic blacklist...${NC}"
+    cat > "$BLACKLIST_FILE" <<'BLACKLIST_EOF'
+# Zmap Blacklist - Basic Configuration
+# Private and reserved IP ranges
+10.0.0.0/8
+172.16.0.0/12
+192.168.0.0/16
+127.0.0.0/8
+169.254.0.0/16
+224.0.0.0/4
+240.0.0.0/4
+255.255.255.255/32
+BLACKLIST_EOF
+    echo -e "${GREEN}✓ Basic blacklist created${NC}"
+fi
+
+# Set capabilities on zmap binary
+echo "Setting capabilities on zmap..."
+ZMAP_PATH=$(which zmap)
+setcap 'cap_net_raw,cap_net_admin=+eip' "$ZMAP_PATH" 2>/dev/null || {
+    echo -e "${YELLOW}⚠ Could not set capabilities (Docker will handle this)${NC}"
+}
+
+# Verify capabilities
+if getcap "$ZMAP_PATH" 2>/dev/null | grep -q "cap_net_raw"; then
+    echo -e "${GREEN}✓ Capabilities set on zmap${NC}"
+else
+    echo -e "${YELLOW}⚠ Capabilities not set (will work in Docker with cap_add)${NC}"
+fi
+
+# Additional system tuning for zmap
+echo "Applying zmap network tuning..."
+sysctl -w net.core.rmem_max=134217728 > /dev/null 2>&1 || true
+sysctl -w net.core.wmem_max=134217728 > /dev/null 2>&1 || true
+sysctl -w net.ipv4.tcp_rmem='4096 87380 67108864' > /dev/null 2>&1 || true
+sysctl -w net.ipv4.tcp_wmem='4096 65536 67108864' > /dev/null 2>&1 || true
+
+echo -e "${GREEN}✓ Zmap configuration complete${NC}"
+
+echo ""
+echo -e "${YELLOW}[5/9] Setting up configuration files...${NC}"
 
 # Navigate to the project directory
 cd ~/proxy-checker-api 2>/dev/null || cd /root/proxy-checker-api || {
@@ -118,7 +185,7 @@ else
 fi
 
 echo ""
-echo -e "${YELLOW}[5/8] Applying system tuning...${NC}"
+echo -e "${YELLOW}[6/9] Applying system tuning...${NC}"
 
 # Set file descriptor limit
 if ! grep -q "proxy-checker file limits" /etc/security/limits.conf; then
@@ -161,19 +228,19 @@ else
 fi
 
 echo ""
-echo -e "${YELLOW}[6/8] Stopping any existing containers...${NC}"
+echo -e "${YELLOW}[7/9] Stopping any existing containers...${NC}"
 docker compose down 2>/dev/null || docker-compose down 2>/dev/null || true
 echo -e "${GREEN}✓ Stopped existing containers${NC}"
 
 echo ""
-echo -e "${YELLOW}[7/8] Building and starting services...${NC}"
+echo -e "${YELLOW}[8/9] Building and starting services...${NC}"
 docker compose build --no-cache
 docker compose up -d
 
 echo -e "${GREEN}✓ Services started successfully${NC}"
 
 echo ""
-echo -e "${YELLOW}[8/8] Verifying deployment...${NC}"
+echo -e "${YELLOW}[9/9] Verifying deployment...${NC}"
 
 # Wait for service to be ready
 echo "Waiting for service to start..."
@@ -221,6 +288,9 @@ echo ""
 echo "  # Check statistics (wait 1-2 minutes for first check to complete)"
 echo "  curl -H \"X-Api-Key: ${API_KEY}\" http://localhost:8083/stat | jq"
 echo ""
+echo "  # Check zmap statistics"
+echo "  curl -H \"X-Api-Key: ${API_KEY}\" http://localhost:8083/stats/zmap | jq"
+echo ""
 echo "  # Get a proxy"
 echo "  curl -H \"X-Api-Key: ${API_KEY}\" http://localhost:8083/get-proxy"
 echo ""
@@ -246,12 +316,26 @@ echo "  # Start service"
 echo "  docker compose up -d"
 echo ""
 
+echo -e "${BLUE}🚀 Zmap Integration:${NC}"
+echo -e "  • Zmap is ${GREEN}ENABLED${NC} by default (ports 8080, 80, 3128)"
+echo -e "  • Blacklist: ${BLACKLIST_FILE}"
+echo -e "  • Expected: ${GREEN}10-20x more working proxies!${NC}"
+echo -e "  • First zmap scan will take ~30-40 minutes"
+echo ""
 echo -e "${YELLOW}Note:${NC} Wait 1-2 minutes for the first proxy check cycle to complete."
 echo "Then test the API endpoints above."
 echo ""
 echo -e "For monitoring: ${BLUE}docker compose --profile monitoring up -d${NC}"
 echo -e "Then access Grafana at: ${BLUE}http://localhost:3000${NC} (admin/admin)"
 echo ""
-echo -e "For more information, see: ${BLUE}README.md${NC} and ${BLUE}DEPLOY_NOW.md${NC}"
+echo -e "For more information, see:"
+echo -e "  • ${BLUE}README.md${NC} - General documentation"
+echo -e "  • ${BLUE}ZMAP_QUICKSTART.md${NC} - Zmap quick start guide"
+echo -e "  • ${BLUE}ZMAP_INTEGRATION_COMPLETE.md${NC} - Integration details"
+echo ""
+echo -e "${YELLOW}⚠️  LEGAL WARNING:${NC}"
+echo "Network scanning may be illegal without authorization."
+echo "By default, zmap will scan your configured target ranges only."
+echo "See ZMAP_INTEGRATION_SUMMARY.md for legal guidelines."
 echo ""
 

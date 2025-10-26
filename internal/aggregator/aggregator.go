@@ -17,8 +17,8 @@ import (
 )
 
 var (
-	// Regex to match proxy formats: IP:PORT or http://IP:PORT
-	proxyRegex = regexp.MustCompile(`(?:http://)?(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}):(\d{2,5})`)
+	// Regex to match proxy formats: IP:PORT or http://IP:PORT or socks4://IP:PORT or socks5://IP:PORT
+	proxyRegex = regexp.MustCompile(`(?:(socks5|socks4|https?)://)?(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}):(\d{2,5})`)
 )
 
 type Aggregator struct {
@@ -31,6 +31,11 @@ type SourceStats struct {
 	URL          string
 	ProxiesFound int
 	Error        string
+}
+
+type ProxyWithProtocol struct {
+	Address  string
+	Protocol string // "http", "socks4", "socks5"
 }
 
 func NewAggregator(cfg config.AggregatorConfig, metricsCollector *metrics.Collector) *Aggregator {
@@ -49,7 +54,7 @@ func NewAggregator(cfg config.AggregatorConfig, metricsCollector *metrics.Collec
 }
 
 // Aggregate fetches proxies from all enabled sources
-func (a *Aggregator) Aggregate(ctx context.Context) ([]string, map[string]SourceStats, error) {
+func (a *Aggregator) Aggregate(ctx context.Context) ([]ProxyWithProtocol, map[string]SourceStats, error) {
 	enabledSources := make([]config.Source, 0)
 	for _, source := range a.config.Sources {
 		if source.Enabled {
@@ -64,7 +69,7 @@ func (a *Aggregator) Aggregate(ctx context.Context) ([]string, map[string]Source
 	log.Infof("Fetching from %d sources", len(enabledSources))
 
 	var wg sync.WaitGroup
-	resultChan := make(chan []string, len(enabledSources))
+	resultChan := make(chan []ProxyWithProtocol, len(enabledSources))
 	statsChan := make(chan SourceStats, len(enabledSources))
 
 	// Fetch from all sources concurrently
@@ -102,7 +107,7 @@ func (a *Aggregator) Aggregate(ctx context.Context) ([]string, map[string]Source
 	close(statsChan)
 
 	// Collect results
-	allProxies := make([]string, 0)
+	allProxies := make([]ProxyWithProtocol, 0)
 	for proxies := range resultChan {
 		allProxies = append(allProxies, proxies...)
 	}
@@ -119,7 +124,7 @@ func (a *Aggregator) Aggregate(ctx context.Context) ([]string, map[string]Source
 	return unique, sourceStats, nil
 }
 
-func (a *Aggregator) fetchSource(ctx context.Context, source config.Source) ([]string, error) {
+func (a *Aggregator) fetchSource(ctx context.Context, source config.Source) ([]ProxyWithProtocol, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", source.URL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
@@ -142,11 +147,24 @@ func (a *Aggregator) fetchSource(ctx context.Context, source config.Source) ([]s
 	// Limit body read to 10MB
 	limitedReader := io.LimitReader(resp.Body, 10*1024*1024)
 
-	return parseProxies(limitedReader)
+	// Detect protocol from source config or URL
+	defaultProtocol := source.Protocol
+	if defaultProtocol == "" || defaultProtocol == "auto" {
+		// Try to detect from URL
+		if strings.Contains(strings.ToLower(source.URL), "socks5") {
+			defaultProtocol = "socks5"
+		} else if strings.Contains(strings.ToLower(source.URL), "socks4") {
+			defaultProtocol = "socks4"
+		} else {
+			defaultProtocol = "http"
+		}
+	}
+
+	return parseProxies(limitedReader, defaultProtocol)
 }
 
-func parseProxies(r io.Reader) ([]string, error) {
-	proxies := make([]string, 0)
+func parseProxies(r io.Reader, defaultProtocol string) ([]ProxyWithProtocol, error) {
+	proxies := make([]ProxyWithProtocol, 0)
 	scanner := bufio.NewScanner(r)
 
 	for scanner.Scan() {
@@ -157,10 +175,28 @@ func parseProxies(r io.Reader) ([]string, error) {
 
 		// Extract proxy using regex
 		matches := proxyRegex.FindStringSubmatch(line)
-		if len(matches) >= 3 {
-			ip := matches[1]
-			port := matches[2]
-			proxy := fmt.Sprintf("%s:%s", ip, port)
+		if len(matches) >= 4 {
+			protocol := matches[1] // Could be empty, "http", "https", "socks4", "socks5"
+			ip := matches[2]
+			port := matches[3]
+			
+			// Determine protocol
+			detectedProtocol := defaultProtocol
+			if protocol != "" {
+				// Protocol explicitly specified in the line
+				if protocol == "socks5" {
+					detectedProtocol = "socks5"
+				} else if protocol == "socks4" {
+					detectedProtocol = "socks4"
+				} else {
+					detectedProtocol = "http"
+				}
+			}
+			
+			proxy := ProxyWithProtocol{
+				Address:  fmt.Sprintf("%s:%s", ip, port),
+				Protocol: detectedProtocol,
+			}
 			proxies = append(proxies, proxy)
 		}
 	}
@@ -172,14 +208,15 @@ func parseProxies(r io.Reader) ([]string, error) {
 	return proxies, nil
 }
 
-func deduplicateProxies(proxies []string) []string {
+func deduplicateProxies(proxies []ProxyWithProtocol) []ProxyWithProtocol {
 	seen := make(map[string]struct{}, len(proxies))
-	unique := make([]string, 0, len(proxies))
+	unique := make([]ProxyWithProtocol, 0, len(proxies))
 
 	for _, proxy := range proxies {
-		normalized := strings.ToLower(strings.TrimSpace(proxy))
-		if _, exists := seen[normalized]; !exists {
-			seen[normalized] = struct{}{}
+		// Key by address + protocol
+		key := fmt.Sprintf("%s|%s", strings.ToLower(strings.TrimSpace(proxy.Address)), proxy.Protocol)
+		if _, exists := seen[key]; !exists {
+			seen[key] = struct{}{}
 			unique = append(unique, proxy)
 		}
 	}

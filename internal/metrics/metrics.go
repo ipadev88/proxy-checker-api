@@ -1,6 +1,8 @@
 package metrics
 
 import (
+	"fmt"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
@@ -18,6 +20,11 @@ type Collector struct {
 	
 	// Aggregation metrics
 	proxiesScraped *prometheus.CounterVec
+	
+	// Zmap metrics
+	zmapScansTotal      *prometheus.CounterVec
+	zmapCandidatesFound *prometheus.GaugeVec
+	zmapScanDuration    prometheus.Histogram
 	
 	// API metrics
 	apiRequests    *prometheus.CounterVec
@@ -78,6 +85,30 @@ func NewCollector(namespace string) *Collector {
 			},
 			[]string{"source"},
 		),
+		zmapScansTotal: promauto.NewCounterVec(
+			prometheus.CounterOpts{
+				Namespace: namespace,
+				Name:      "zmap_scans_total",
+				Help:      "Total number of zmap scans executed",
+			},
+			[]string{"port", "status"},
+		),
+		zmapCandidatesFound: promauto.NewGaugeVec(
+			prometheus.GaugeOpts{
+				Namespace: namespace,
+				Name:      "zmap_candidates_found",
+				Help:      "Number of candidate proxies found by zmap",
+			},
+			[]string{"port"},
+		),
+		zmapScanDuration: promauto.NewHistogram(
+			prometheus.HistogramOpts{
+				Namespace: namespace,
+				Name:      "zmap_scan_duration_seconds",
+				Help:      "Duration of zmap scans in seconds",
+				Buckets:   []float64{10, 30, 60, 120, 300, 600, 1800, 3600, 7200},
+			},
+		),
 		apiRequests: promauto.NewCounterVec(
 			prometheus.CounterOpts{
 				Namespace: namespace,
@@ -132,5 +163,18 @@ func (c *Collector) RecordAPIRequest(method, endpoint, status string) {
 
 func (c *Collector) RecordAPIDuration(method, endpoint string, seconds float64) {
 	c.apiDuration.WithLabelValues(method, endpoint).Observe(seconds)
+}
+
+// Zmap metrics methods
+func (c *Collector) RecordZmapScan(port int, status string) {
+	c.zmapScansTotal.WithLabelValues(fmt.Sprintf("%d", port), status).Inc()
+}
+
+func (c *Collector) RecordZmapCandidates(port int, count int) {
+	c.zmapCandidatesFound.WithLabelValues(fmt.Sprintf("%d", port)).Set(float64(count))
+}
+
+func (c *Collector) RecordZmapDuration(seconds float64) {
+	c.zmapScanDuration.Observe(seconds)
 }
 

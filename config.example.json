@@ -5,36 +5,85 @@
       {
         "url": "https://raw.githubusercontent.com/TheSpeedX/PROXY-List/master/http.txt",
         "type": "txt",
+        "protocol": "http",
         "enabled": true
       },
       {
         "url": "https://raw.githubusercontent.com/clarketm/proxy-list/master/proxy-list-raw.txt",
         "type": "txt",
+        "protocol": "http",
         "enabled": true
       },
       {
         "url": "https://api.proxyscrape.com/v2/?request=get&protocol=http&timeout=10000&country=all",
         "type": "txt",
+        "protocol": "http",
         "enabled": true
       },
       {
         "url": "https://www.proxy-list.download/api/v1/get?type=http",
         "type": "txt",
+        "protocol": "http",
+        "enabled": true
+      },
+      {
+        "url": "https://api.proxyscrape.com/v2/?request=get&protocol=socks4&timeout=10000&country=all",
+        "type": "txt",
+        "protocol": "socks4",
+        "enabled": true
+      },
+      {
+        "url": "https://api.proxyscrape.com/v2/?request=get&protocol=socks5&timeout=10000&country=all",
+        "type": "txt",
+        "protocol": "socks5",
+        "enabled": true
+      },
+      {
+        "url": "https://raw.githubusercontent.com/TheSpeedX/PROXY-List/master/socks4.txt",
+        "type": "txt",
+        "protocol": "socks4",
+        "enabled": true
+      },
+      {
+        "url": "https://raw.githubusercontent.com/TheSpeedX/PROXY-List/master/socks5.txt",
+        "type": "txt",
+        "protocol": "socks5",
         "enabled": true
       }
     ],
     "user_agent": "Mozilla/5.0 (compatible; ProxyChecker/1.0)"
   },
+  "zmap": {
+    "enabled": true,
+    "ports": [8080, 80, 3128, 1080, 1081],
+    "rate_limit": 10000,
+    "bandwidth": "10M",
+    "max_runtime_seconds": 3600,
+    "target_ranges": [],
+    "blacklist": ["/etc/proxy-checker/blacklist.txt"],
+    "interface": "",
+    "zmap_binary": "/usr/local/bin/zmap",
+    "output_format": "csv",
+    "zmap_extra_args": [],
+    "cooldown_seconds": 3600,
+    "comment": "Ports 8080,80,3128=HTTP proxies; 1080=SOCKS5; 1081=SOCKS4"
+  },
   "checker": {
-    "timeout_ms": 15000,
+    "timeout_ms": 10000,
     "concurrency_total": 20000,
     "batch_size": 2000,
-    "retries": 1,
-    "test_url": "https://www.google.com/generate_204",
+    "retries": 0,
+    "test_url": "http://www.gstatic.com/generate_204",
     "mode": "full-http",
     "enable_adaptive_concurrency": true,
-    "max_fd_usage_percent": 80,
-    "max_cpu_usage_percent": 95
+    "max_fd_usage_percent": 70,
+    "max_cpu_usage_percent": 75,
+    "enable_fast_filter": true,
+    "fast_filter_timeout_ms": 2000,
+    "fast_filter_concurrency": 50000,
+    "socks_enabled": true,
+    "socks_timeout_ms": 15000,
+    "socks_test_url": "http://www.gstatic.com/generate_204"
   },
   "api": {
     "addr": ":8083",

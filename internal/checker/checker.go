@@ -298,3 +298,58 @@ func (c *Checker) CheckSingle(ctx context.Context, proxyAddr string) CheckResult
 	return c.checkProxyWithRetries(ctx, proxyAddr)
 }
 
+// CheckSingleWithProtocol checks a single proxy with protocol awareness
+func (c *Checker) CheckSingleWithProtocol(ctx context.Context, proxyAddr string, protocol string) CheckResult {
+	startTime := time.Now()
+	
+	maxRetries := c.config.Retries
+	if maxRetries < 0 {
+		maxRetries = 0
+	}
+
+	var lastError string
+
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		if attempt > 0 {
+			backoff := time.Duration(attempt*attempt*100) * time.Millisecond
+			time.Sleep(backoff)
+		}
+
+		var result CheckResult
+		if protocol == "socks4" || protocol == "socks5" {
+			// Use SOCKS checker
+			if !c.cfg.SocksEnabled {
+				return CheckResult{
+					Proxy:     proxyAddr,
+					Alive:     false,
+					LatencyMs: 0,
+					Error:     "SOCKS checking disabled",
+				}
+			}
+			result = CheckSocksProxy(ctx, proxyAddr, protocol, c.cfg.SocksTestURL, c.cfg.SocksTimeoutMs)
+		} else {
+			// Use HTTP checker
+			result = c.checkProxyWithRetries(ctx, proxyAddr)
+		}
+
+		if result.Alive {
+			latency := time.Since(startTime).Milliseconds()
+			result.LatencyMs = latency
+			return result
+		}
+
+		lastError = result.Error
+	}
+
+	return CheckResult{
+		Proxy: proxyAddr,
+		Alive: false,
+		Error: lastError,
+	}
+}
+
+// CheckProxyWithProtocol is an alias for CheckSingleWithProtocol
+func (c *Checker) CheckProxyWithProtocol(ctx context.Context, address string, protocol string) CheckResult {
+	return c.CheckSingleWithProtocol(ctx, address, protocol)
+}
+
