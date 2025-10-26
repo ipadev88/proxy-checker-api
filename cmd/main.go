@@ -177,39 +177,17 @@ func runAggregationCycle(ctx context.Context, agg *aggregator.Aggregator, chk *c
 	log.Info("Starting immediate check of scraped proxies...")
 	scrapedResults := checkProxiesInBatches(ctx, scrapedProxies, chk)
 	
-	// Process scraped results immediately (don't wait for zmap)
+	// PHASE 4: Process scraped results IMMEDIATELY and update snapshot
 	log.Info("Processing scraped proxy results...")
 	
-	// Wait for zmap to finish (with reasonable timeout)
-	// Zmap should complete in ~10 minutes (max_runtime_seconds)
-	select {
-	case <-zmapDone:
-		log.Info("Zmap scan completed")
-	case <-time.After(15 * time.Minute):
-		log.Warn("Zmap timeout exceeded 15 minutes, processing scraped results first...")
-	}
-	
-	// PHASE 4: Check zmap candidates if available
-	var zmapResults []checker.CheckResult
-	if len(zmapProxies) > 0 {
-		log.Infof("Starting immediate check of %d zmap candidates...", len(zmapProxies))
-		zmapResults = checkProxiesInBatches(ctx, zmapProxies, chk)
-	}
-	
-	log.Infof("Total candidates checked: scraped=%d, zmap=%d",
-		len(scrapedResults), len(zmapResults))
+	scrapedAliveCount := 0
+	scrapedDeadCount := 0
+	scrapedAliveProxies := make([]snapshot.Proxy, 0)
 
-	// PHASE 5: Process results with source tracking
-
-	aliveCount := 0
-	deadCount := 0
-	aliveProxies := make([]snapshot.Proxy, 0)
-
-	// Process scraped results
 	for _, result := range scrapedResults {
 		if result.Alive {
-			aliveCount++
-			aliveProxies = append(aliveProxies, snapshot.Proxy{
+			scrapedAliveCount++
+			scrapedAliveProxies = append(scrapedAliveProxies, snapshot.Proxy{
 				Address:   result.Proxy,
 				Protocol:  result.Protocol,
 				Source:    "scraped",
@@ -218,50 +196,107 @@ func runAggregationCycle(ctx context.Context, agg *aggregator.Aggregator, chk *c
 				LastCheck: time.Now(),
 			})
 		} else {
-			deadCount++
+			scrapedDeadCount++
 		}
 	}
 
-	// Process zmap results
-	for _, result := range zmapResults {
-		if result.Alive {
-			aliveCount++
-			aliveProxies = append(aliveProxies, snapshot.Proxy{
-				Address:   result.Proxy,
-				Protocol:  result.Protocol,
-				Source:    "zmap",
-				Alive:     true,
-				LatencyMs: result.LatencyMs,
-				LastCheck: time.Now(),
-			})
-		} else {
-			deadCount++
-		}
+	scrapedTotalChecked := len(scrapedResults)
+	scrapedAlivePercent := 0.0
+	if scrapedTotalChecked > 0 {
+		scrapedAlivePercent = float64(scrapedAliveCount) / float64(scrapedTotalChecked) * 100.0
 	}
 
-	totalChecked := len(scrapedResults) + len(zmapResults)
-	alivePercent := 0.0
-	if totalChecked > 0 {
-		alivePercent = float64(aliveCount) / float64(totalChecked) * 100.0
-	}
+	log.Infof("Scraped proxies: %d alive, %d dead (%.2f%% alive)",
+		scrapedAliveCount, scrapedDeadCount, scrapedAlivePercent)
 
-	log.Infof("Check complete: %d alive, %d dead (%.2f%% alive)",
-		aliveCount, deadCount, alivePercent)
-
-	// Update snapshot
-	stats := snapshot.Stats{
+	// Update snapshot with scraped results IMMEDIATELY (don't wait for zmap)
+	scrapedStats := snapshot.Stats{
 		TotalScraped:  totalScraped,
-		TotalAlive:    aliveCount,
-		TotalDead:     deadCount,
-		AlivePercent:  alivePercent,
+		TotalAlive:    scrapedAliveCount,
+		TotalDead:     scrapedDeadCount,
+		AlivePercent:  scrapedAlivePercent,
 		LastCheckTime: time.Now(),
 		SourceStats:   sourceStats,
 	}
+	
+	snap.Update(scrapedAliveProxies, scrapedStats)
+	log.Info("Snapshot updated with scraped proxies (zmap running in background)")
 
-	snap.Update(aliveProxies, stats)
+	// PHASE 5: Wait for zmap in background and process when ready
+	go func() {
+		// Wait for zmap to finish (with reasonable timeout)
+		select {
+		case <-zmapDone:
+			log.Info("Zmap scan completed, processing candidates...")
+		case <-time.After(15 * time.Minute):
+			log.Warn("Zmap timeout exceeded 15 minutes")
+			return
+		}
+		
+		// Check zmap candidates if available
+		if len(zmapProxies) == 0 {
+			log.Info("No zmap candidates to check")
+			return
+		}
+
+		log.Infof("Starting check of %d zmap candidates...", len(zmapProxies))
+		zmapResults := checkProxiesInBatches(ctx, zmapProxies, chk)
+		
+		// Process zmap results
+		zmapAliveProxies := make([]snapshot.Proxy, 0)
+		zmapAliveCount := 0
+		zmapDeadCount := 0
+		
+		for _, result := range zmapResults {
+			if result.Alive {
+				zmapAliveCount++
+				zmapAliveProxies = append(zmapAliveProxies, snapshot.Proxy{
+					Address:   result.Proxy,
+					Protocol:  result.Protocol,
+					Source:    "zmap",
+					Alive:     true,
+					LatencyMs: result.LatencyMs,
+					LastCheck: time.Now(),
+				})
+			} else {
+				zmapDeadCount++
+			}
+		}
+
+		log.Infof("Zmap proxies: %d alive, %d dead", zmapAliveCount, zmapDeadCount)
+
+		// Merge zmap results with existing scraped proxies
+		allAliveProxies := append(scrapedAliveProxies, zmapAliveProxies...)
+		totalAlive := scrapedAliveCount + zmapAliveCount
+		totalDead := scrapedDeadCount + zmapDeadCount
+		totalAll := totalAlive + totalDead
+		
+		overallAlivePercent := 0.0
+		if totalAll > 0 {
+			overallAlivePercent = float64(totalAlive) / float64(totalAll) * 100.0
+		}
+
+		// Update snapshot with combined results
+		combinedStats := snapshot.Stats{
+			TotalScraped:  totalScraped,
+			TotalAlive:    totalAlive,
+			TotalDead:     totalDead,
+			AlivePercent:  overallAlivePercent,
+			LastCheckTime: time.Now(),
+			SourceStats:   sourceStats,
+		}
+		
+		snap.Update(allAliveProxies, combinedStats)
+		log.Infof("Snapshot updated with zmap results: total %d alive (scraped: %d, zmap: %d)",
+			totalAlive, scrapedAliveCount, zmapAliveCount)
+	}()
+
+	log.Infof("Aggregation cycle complete for scraped proxies: %d alive, %d dead (%.2f%% alive)",
+		scrapedAliveCount, scrapedDeadCount, scrapedAlivePercent)
+	log.Info("Zmap scan continues in background...")
 
 	totalDuration := time.Since(start)
-	log.Infof("Aggregation cycle complete in %v", totalDuration)
+	log.Infof("Aggregation cycle completed in %v", totalDuration)
 
 	// Log memory stats
 	var m runtime.MemStats
