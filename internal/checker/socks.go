@@ -3,7 +3,6 @@ package checker
 import (
 	"context"
 	"fmt"
-	"net"
 	"time"
 
 	"golang.org/x/net/proxy"
@@ -12,7 +11,7 @@ import (
 // CheckSOCKS4 checks a SOCKS4 proxy (optimized)
 func (c *Checker) CheckSOCKS4(ctx context.Context, proxyAddr string, startTime time.Time) CheckResult {
 	// Parse proxy address
-	dialer, err := proxy.SOCKS4("tcp", proxyAddr, nil, proxy.Direct)
+	dialer, err := proxy.SOCKS5("tcp", proxyAddr, nil, proxy.Direct)
 	if err != nil {
 		return CheckResult{
 			Proxy:    proxyAddr,

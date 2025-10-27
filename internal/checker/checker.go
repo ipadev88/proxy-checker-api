@@ -78,22 +78,21 @@ func (c *Checker) GetConfig() *config.CheckerConfig {
 // CheckProxies performs high-concurrency proxy validation
 func (c *Checker) CheckProxies(ctx context.Context, proxies []string) []CheckResult {
 	totalProxies := len(proxies)
-	log.Infof("Starting proxy check: %d proxies, concurrency=%d (adaptive), batch_size=%d (adaptive)",
-		totalProxies, concurrency, adaptiveBatchSize)
-
-	startTime := time.Now()
 
 	// Adaptive concurrency adjustment
-	concurrency := c.config.ConcurrencyTotal
+	adaptiveConcurrency := c.config.ConcurrencyTotal
 	if c.config.EnableAdaptiveConcurrency {
-		concurrency = c.adjustConcurrency(concurrency)
+		adaptiveConcurrency = c.adjustConcurrency(adaptiveConcurrency)
 	}
+
+	log.Infof("Starting proxy check: %d proxies, concurrency=%d (adaptive), batch_size=%d (adaptive)",
+		totalProxies, adaptiveConcurrency, c.config.BatchSize)
 
 	results := make([]CheckResult, 0, totalProxies)
 	resultsMu := sync.Mutex{}
 
 	// Semaphore for concurrency control
-	sem := make(chan struct{}, concurrency)
+	sem := make(chan struct{}, adaptiveConcurrency)
 
 	// Progress tracking
 	var completed atomic.Int64
@@ -116,7 +115,7 @@ func (c *Checker) CheckProxies(ctx context.Context, proxies []string) []CheckRes
 	}
 
 	// Reduce batch size if high concurrency to avoid memory spikes
-	if concurrency > 5000 {
+	if adaptiveConcurrency > 5000 {
 		adaptiveBatchSize = adaptiveBatchSize / 2
 	}
 
@@ -161,7 +160,7 @@ func (c *Checker) CheckProxies(ctx context.Context, proxies []string) []CheckRes
 		}
 
 		// Small delay between batches to prevent thundering herd
-		if i+batchSize < totalProxies {
+		if i+adaptiveBatchSize < totalProxies {
 			time.Sleep(10 * time.Millisecond)
 		}
 	}
@@ -307,7 +306,7 @@ func (c *Checker) adjustConcurrency(requested int) int {
 	var rlim syscall.Rlimit
 	if err := syscall.Getrlimit(syscall.RLIMIT_NOFILE, &rlim); err == nil {
 		usedFDs := float64(requested) * 1.5 // Estimate FDs needed
-		availableFDs := float64(rlim.Cur) * c.config.MaxFdUsagePercent / 100.0
+		availableFDs := float64(rlim.Cur) * float64(c.config.MaxFdUsagePercent) / 100.0
 
 		if usedFDs > availableFDs {
 			adjusted := int(availableFDs / 1.5)
