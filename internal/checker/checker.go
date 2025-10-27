@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"time"
 
 	"github.com/proxy-checker-api/internal/config"
@@ -37,16 +38,16 @@ func NewChecker(cfg config.CheckerConfig, metricsCollector *metrics.Collector) *
 	transport := &http.Transport{
 		Proxy: nil, // We set proxy per-request
 		DialContext: (&net.Dialer{
-			Timeout:   time.Duration(cfg.TimeoutMs) * time.Millisecond,
-			KeepAlive: 30 * time.Second,
+			Timeout:   time.Duration(cfg.TimeoutMs/2) * time.Millisecond, // Faster dial
+			KeepAlive: 15 * time.Second, // Shorter keep-alive for proxy checking
 		}).DialContext,
 		ForceAttemptHTTP2:     false, // Disable HTTP/2 for proxy checking
-		MaxIdleConns:          cfg.ConcurrencyTotal,
-		MaxIdleConnsPerHost:   100,
+		MaxIdleConns:          cfg.ConcurrencyTotal / 10, // Reduced idle connections
+		MaxIdleConnsPerHost:   10, // Much lower per-host limit
 		MaxConnsPerHost:       0, // No limit
-		IdleConnTimeout:       90 * time.Second,
-		TLSHandshakeTimeout:   time.Duration(cfg.TimeoutMs) * time.Millisecond,
-		ExpectContinueTimeout: 1 * time.Second,
+		IdleConnTimeout:       30 * time.Second, // Shorter idle timeout
+		TLSHandshakeTimeout:   time.Duration(cfg.TimeoutMs/2) * time.Millisecond,
+		ExpectContinueTimeout: 500 * time.Millisecond, // Faster expect timeout
 		DisableKeepAlives:     false,
 		TLSClientConfig: &tls.Config{
 			InsecureSkipVerify: true, // Required for proxy checking
@@ -77,7 +78,8 @@ func (c *Checker) GetConfig() *config.CheckerConfig {
 // CheckProxies performs high-concurrency proxy validation
 func (c *Checker) CheckProxies(ctx context.Context, proxies []string) []CheckResult {
 	totalProxies := len(proxies)
-	log.Infof("Starting proxy check: %d proxies, concurrency=%d", totalProxies, c.config.ConcurrencyTotal)
+	log.Infof("Starting proxy check: %d proxies, concurrency=%d (adaptive), batch_size=%d (adaptive)",
+		totalProxies, concurrency, adaptiveBatchSize)
 
 	startTime := time.Now()
 
@@ -107,16 +109,22 @@ func (c *Checker) CheckProxies(ctx context.Context, proxies []string) []CheckRes
 		}
 	}()
 
-	// Process in batches
-	batchSize := c.config.BatchSize
-	if batchSize <= 0 {
-		batchSize = 2000
+	// Adaptive batch sizing based on system resources
+	adaptiveBatchSize := c.config.BatchSize
+	if adaptiveBatchSize <= 0 {
+		adaptiveBatchSize = 1000 // Default smaller batch
 	}
 
+	// Reduce batch size if high concurrency to avoid memory spikes
+	if concurrency > 5000 {
+		adaptiveBatchSize = adaptiveBatchSize / 2
+	}
+
+	// Process in adaptive batches
 	var wg sync.WaitGroup
 
-	for i := 0; i < totalProxies; i += batchSize {
-		end := i + batchSize
+	for i := 0; i < totalProxies; i += adaptiveBatchSize {
+		end := i + adaptiveBatchSize
 		if end > totalProxies {
 			end = totalProxies
 		}
@@ -289,14 +297,42 @@ func (c *Checker) adjustConcurrency(requested int) int {
 	// Check goroutine count
 	numGoroutines := runtime.NumGoroutine()
 	if numGoroutines > requested*2 {
-		adjusted := requested * 8 / 10 // Reduce by 20%
+		adjusted := requested * 6 / 10 // Reduce by 40% when high load
 		log.Warnf("High goroutine count (%d), reducing concurrency: %d -> %d",
 			numGoroutines, requested, adjusted)
 		return adjusted
 	}
 
-	// Could also check file descriptors, CPU usage, etc.
-	// For now, return requested
+	// Check file descriptor usage
+	var rlim syscall.Rlimit
+	if err := syscall.Getrlimit(syscall.RLIMIT_NOFILE, &rlim); err == nil {
+		usedFDs := float64(requested) * 1.5 // Estimate FDs needed
+		availableFDs := float64(rlim.Cur) * c.config.MaxFdUsagePercent / 100.0
+
+		if usedFDs > availableFDs {
+			adjusted := int(availableFDs / 1.5)
+			if adjusted < 100 {
+				adjusted = 100 // Minimum
+			}
+			log.Warnf("High FD usage (limit: %d, needed: %.0f), reducing concurrency: %d -> %d",
+				rlim.Cur, usedFDs, requested, adjusted)
+			return adjusted
+		}
+	}
+
+	// Check memory usage
+	var m runtime.MemStats
+	runtime.ReadMemStats(&m)
+	memUsageGB := float64(m.Alloc) / 1024 / 1024 / 1024
+	maxMemGB := 2.0 // 2GB limit
+
+	if memUsageGB > maxMemGB {
+		adjusted := requested * 7 / 10 // Reduce by 30%
+		log.Warnf("High memory usage (%.2fGB), reducing concurrency: %d -> %d",
+			memUsageGB, requested, adjusted)
+		return adjusted
+	}
+
 	return requested
 }
 

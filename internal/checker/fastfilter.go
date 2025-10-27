@@ -18,8 +18,8 @@ func FastConnectFilter(ctx context.Context, proxies []string, timeoutMs int, con
 		return proxies
 	}
 
-	log.Infof("Starting fast TCP filter: %d proxies, concurrency=%d, timeout=%dms",
-		len(proxies), concurrency, timeoutMs)
+	log.Infof("Starting fast TCP filter: %d proxies, concurrency=%d (requested=%d), timeout=%dms",
+		len(proxies), adaptiveConcurrency, concurrency, timeoutMs)
 
 	startTime := time.Now()
 	timeout := time.Duration(timeoutMs) * time.Millisecond
@@ -27,8 +27,14 @@ func FastConnectFilter(ctx context.Context, proxies []string, timeoutMs int, con
 	connectable := make([]string, 0, len(proxies)/5) // Estimate ~20% alive
 	var mu sync.Mutex
 
+	// Adaptive concurrency based on system resources
+	adaptiveConcurrency := concurrency
+	if concurrency > 5000 {
+		adaptiveConcurrency = 5000 // Cap at 5k for fast filter
+	}
+
 	// Semaphore for concurrency control
-	sem := make(chan struct{}, concurrency)
+	sem := make(chan struct{}, adaptiveConcurrency)
 
 	// Progress tracking
 	var completed atomic.Int64

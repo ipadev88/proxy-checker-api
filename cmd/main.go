@@ -390,21 +390,27 @@ func checkProxiesInBatches(ctx context.Context, proxies []aggregator.ProxyWithPr
 		}
 	}
 	
-	// Check SOCKS4 proxies in parallel
+	// Check SOCKS4 proxies in parallel (optimized)
 	if len(socks4Proxies) > 0 {
 		log.Infof("Checking %d SOCKS4 proxies...", len(socks4Proxies))
+
+		// Adaptive concurrency for SOCKS (lower than HTTP)
+		socksConcurrency := 500
+		if len(socks4Proxies) < 100 {
+			socksConcurrency = len(socks4Proxies) // Don't over-parallelize small batches
+		}
+
 		var wg sync.WaitGroup
 		var mu sync.Mutex
-		concurrency := 1000 // Limit concurrent SOCKS checks
-		sem := make(chan struct{}, concurrency)
-		
+		sem := make(chan struct{}, socksConcurrency)
+
 		for _, addr := range socks4Proxies {
 			wg.Add(1)
 			go func(address string) {
 				defer wg.Done()
 				sem <- struct{}{}        // Acquire
 				defer func() { <-sem }() // Release
-				
+
 				result := chk.CheckProxyWithProtocol(ctx, address, "socks4")
 				mu.Lock()
 				if idx, ok := indexMap[address]; ok {
@@ -414,23 +420,30 @@ func checkProxiesInBatches(ctx context.Context, proxies []aggregator.ProxyWithPr
 			}(addr)
 		}
 		wg.Wait()
+		log.Infof("SOCKS4 check complete: %d proxies", len(socks4Proxies))
 	}
-	
-	// Check SOCKS5 proxies in parallel
+
+	// Check SOCKS5 proxies in parallel (optimized)
 	if len(socks5Proxies) > 0 {
 		log.Infof("Checking %d SOCKS5 proxies...", len(socks5Proxies))
+
+		// Adaptive concurrency for SOCKS (lower than HTTP)
+		socksConcurrency := 500
+		if len(socks5Proxies) < 100 {
+			socksConcurrency = len(socks5Proxies) // Don't over-parallelize small batches
+		}
+
 		var wg sync.WaitGroup
 		var mu sync.Mutex
-		concurrency := 1000 // Limit concurrent SOCKS checks
-		sem := make(chan struct{}, concurrency)
-		
+		sem := make(chan struct{}, socksConcurrency)
+
 		for _, addr := range socks5Proxies {
 			wg.Add(1)
 			go func(address string) {
 				defer wg.Done()
 				sem <- struct{}{}        // Acquire
 				defer func() { <-sem }() // Release
-				
+
 				result := chk.CheckProxyWithProtocol(ctx, address, "socks5")
 				mu.Lock()
 				if idx, ok := indexMap[address]; ok {
@@ -440,6 +453,7 @@ func checkProxiesInBatches(ctx context.Context, proxies []aggregator.ProxyWithPr
 			}(addr)
 		}
 		wg.Wait()
+		log.Infof("SOCKS5 check complete: %d proxies", len(socks5Proxies))
 	}
 	
 	log.Infof("Full check complete: processed %d proxies", len(results))
