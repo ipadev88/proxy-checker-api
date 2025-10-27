@@ -78,6 +78,7 @@ func (c *Checker) GetConfig() *config.CheckerConfig {
 // CheckProxies performs high-concurrency proxy validation
 func (c *Checker) CheckProxies(ctx context.Context, proxies []string) []CheckResult {
 	totalProxies := len(proxies)
+	startTime := time.Now()
 
 	// Adaptive concurrency adjustment
 	adaptiveConcurrency := c.config.ConcurrencyTotal
@@ -306,7 +307,7 @@ func (c *Checker) adjustConcurrency(requested int) int {
 	var rlim syscall.Rlimit
 	if err := syscall.Getrlimit(syscall.RLIMIT_NOFILE, &rlim); err == nil {
 		usedFDs := float64(requested) * 1.5 // Estimate FDs needed
-		availableFDs := float64(rlim.Cur) * float64(c.config.MaxFdUsagePercent) / 100.0
+		availableFDs := float64(rlim.Cur) * float64(c.config.MaxFDUsagePercent) / 100.0
 
 		if usedFDs > availableFDs {
 			adjusted := int(availableFDs / 1.5)
